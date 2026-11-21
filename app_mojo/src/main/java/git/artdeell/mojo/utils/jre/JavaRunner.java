@@ -16,7 +16,6 @@ import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.awt.AWTView;
 import git.artdeell.mojo.multirt.MultiRTUtils;
 import git.artdeell.mojo.multirt.Runtime;
-import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.utils.JREUtils;
 
 import java.io.File;
@@ -96,8 +95,10 @@ public class JavaRunner {
         String resolvFile;
         resolvFile = new File(Tools.DIR_DATA,"resolv.conf").getAbsolutePath();
 
-        userArguments.add(0, "-Xms"+LauncherPreferences.PREF_RAM_ALLOCATION+"M");
-        userArguments.add(0, "-Xmx"+LauncherPreferences.PREF_RAM_ALLOCATION+"M");
+        // The tuner may have lowered the heap because the device does not have enough free RAM
+        int heapMb = JvmTuner.getHeapMb();
+        userArguments.add(0, "-Xms"+heapMb+"M");
+        userArguments.add(0, "-Xmx"+heapMb+"M");
 
         ArrayList<String> overridableArguments = new ArrayList<>(Arrays.asList(
                 "-Djava.home=" + runtimeHome,
@@ -283,6 +284,8 @@ public class JavaRunner {
         if(getCacioJavaArgs(runtimeArgs,runtime.javaVersion == 8)) hasJavaAgent = true;
         runtimeArgs.addAll(getJavaArgs(runtimeHomeDir.getAbsolutePath(), vmArgs));
         vmArgs.clear();
+        // GC and JIT flags that suit phones (skipped for everything that is already set)
+        JvmTuner.addTuningArgs(runtimeArgs);
 
 
         runtimeArgs.add("-XX:ActiveProcessorCount=" + java.lang.Runtime.getRuntime().availableProcessors());

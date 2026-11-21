@@ -160,39 +160,20 @@ public class GameRunner {
         if(!performAuthPing(activity, account)) account = account.toLocal();
 
         int freeDeviceMemory = Tools.getFreeDeviceMemory(activity);
-        int localeString;
         int freeAddressSpace = Architecture.is32BitsDevice() ? Tools.getMaxContinuousAddressSpaceSize() : -1;
         Log.i("MemStat", "Free RAM: " + freeDeviceMemory + " Addressable: " + freeAddressSpace);
-        boolean showAddressMemoryWarning = freeDeviceMemory > freeAddressSpace && freeAddressSpace != -1;
-        if(showAddressMemoryWarning) {
-            freeDeviceMemory = freeAddressSpace;
-            localeString = R.string.address_memory_warning_msg;
-        } else {
-            localeString = R.string.memory_warning_msg;
+        // A 32 bit process can only map the heap into a continuous free part of its address space
+        boolean addressSpaceLimited = freeAddressSpace != -1 && freeDeviceMemory > freeAddressSpace;
+
+        // Do not give the game more memory than the device can spare. A heap that is too big makes
+        // Android kill the game or swap it until it hangs. Instead of a warning that the player has
+        // to click away, the heap is lowered and the player gets a short notice.
+        final int requestedHeap = LauncherPreferences.PREF_RAM_ALLOCATION;
+        final int heapMb = JvmTuner.resolveHeap(requestedHeap, freeDeviceMemory, addressSpaceLimited ? freeAddressSpace : -1);
+        if(heapMb < requestedHeap && (addressSpaceLimited || LauncherPreferences.PREF_SHOW_MEMORY_WARNING_DIALOG)) {
+            activity.runOnUiThread(() -> Toast.makeText(activity,
+                    activity.getString(R.string.boost_heap_reduced, heapMb, requestedHeap), Toast.LENGTH_LONG).show());
         }
-
-        if(LauncherPreferences.PREF_RAM_ALLOCATION > freeDeviceMemory && (showAddressMemoryWarning || LauncherPreferences.PREF_SHOW_MEMORY_WARNING_DIALOG)) {
-            int finalDeviceMemory = freeDeviceMemory;
-            LifecycleAwareAlertDialog.DialogCreator dialogCreator = (dialog, builder) -> {
-                builder.setMessage(activity.getString(localeString, finalDeviceMemory, LauncherPreferences.PREF_RAM_ALLOCATION))
-                        .setPositiveButton(android.R.string.ok, (d, w) -> {
-                        });
-
-                if (!showAddressMemoryWarning) {
-                    builder.setNegativeButton(R.string.option_do_not_show_again, (d, w) -> {
-                        LauncherPreferences.DEFAULT_PREF.edit().putBoolean("showMemoryWarning", false).apply();
-                        Toast.makeText(activity, R.string.notification_permission_toast, Toast.LENGTH_SHORT).show();
-                    });
-                }
-            };
-
-
-                if (LifecycleAwareAlertDialog.haltOnDialog(activity.getLifecycle(), activity, dialogCreator)) {
-                    return; // If the dialog's lifecycle has ended, return without
-                    // actually launching the game, thus giving us the opportunity
-                    // to start after the activity is shown again
-                }
-            }
         File gamedir = instance.getGameDirectory();
         JVersionList.Version versionInfo = Tools.getVersionInfo(versionId);
         // We don't need the library list, the asset index, client download info for the code below
@@ -332,11 +313,20 @@ public class GameRunner {
         javaArgList.add("-Dorg.lwjgl.opengl.libname=libGLMojo.so");
         javaArgList.add("-Dorg.lwjgl.freetype.libname="+ Tools.NATIVE_LIB_DIR+"/libfreetype.so");
 
-        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg,LauncherPreferences.PREF_RAM_ALLOCATION), Toast.LENGTH_SHORT).show());
+        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg, JvmTuner.getHeapMb()), Toast.LENGTH_SHORT).show());
 
         Log.i("GameRunner", "Running with "+ launchArgs.toString());
 
         String mainClass = versionInfo.mainClass;
+
+        // The JVM and all of its threads (server, render, GC, JIT) get the priority of this thread
+        // when they are created. A slightly higher priority keeps the game ticking when other
+        // apps and system services use the CPU.
+        try {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_FOREGROUND);
+        } catch (Throwable t) {
+            Log.w("GameRunner", "Failed to raise the priority of the JVM thread", t);
+        }
 
         try {
             JavaRunner.nativeSetupExit(activity);

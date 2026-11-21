@@ -8,6 +8,16 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <time.h>
+
+#ifndef F_SETPIPE_SZ
+#define F_SETPIPE_SZ 1031
+#endif
+
+// The log file is flushed to the storage at most this often. A sync after every message blocked
+// the logging thread for long, the pipe filled up and the game threads that print to stdout hung.
+#define LOG_SYNC_INTERVAL_MS 5000
+#define LOG_PIPE_SIZE (1024 * 1024)
 
 //
 // Created by maks on 17.02.21.
@@ -20,11 +30,24 @@ static volatile jobject logListener = NULL;
 static int latestlog_fd = -1;
 
 
+static long long monotonic_ms() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long) ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+}
+
+// buf has to be NUL-terminated
 static bool recordBuffer(char* buf, ssize_t len) {
+    static volatile long long last_sync_ms = 0;
     if(strstr(buf, "Session ID is")) return false;
     if(latestlog_fd != -1) {
         write(latestlog_fd, buf, len);
-        fdatasync(latestlog_fd);
+        // Data that was written is not lost when the process dies, only a power loss can lose it
+        long long now = monotonic_ms();
+        if(now - last_sync_ms >= LOG_SYNC_INTERVAL_MS) {
+            last_sync_ms = now;
+            fdatasync(latestlog_fd);
+        }
     }
     return true;
 }
@@ -37,6 +60,7 @@ static void *logger_thread(void* param) {
     ssize_t  rsize;
     char buf[2050];
     while((rsize = read(pfd[0], buf, sizeof(buf)-1)) > 0) {
+        buf[rsize]=0x00; // terminate before the buffer is searched
         bool shouldRecordString = recordBuffer(buf, rsize); //record with newline int latestlog
         if(buf[rsize-1]=='\n') {
             rsize=rsize-1; //truncate
@@ -72,6 +96,9 @@ Java_git_artdeell_mojo_Logger_begin(JNIEnv *env, __attribute((unused)) jclass cl
 
     /* create the pipe and redirect stdout and stderr */
     pipe(pfd);
+    // The default pipe holds 64 KB. A bigger one lets the game print a burst of messages without
+    // waiting for the logging thread.
+    fcntl(pfd[1], F_SETPIPE_SZ, LOG_PIPE_SIZE);
     dup2(pfd[1], 1);
     dup2(pfd[1], 2);
 

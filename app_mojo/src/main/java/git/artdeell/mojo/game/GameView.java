@@ -45,6 +45,7 @@ import static git.artdeell.mojo.game.platform.Platform.PLATFORM;
  * Class dealing with showing minecraft surface and taking inputs to dispatch them to minecraft
  */
 public class GameView extends FrameLayout implements PlatformGrabListener, SurfaceProvider.SurfaceCallback {
+    private static final long JVM_MAIN_THREAD_STACK_SIZE = 8L * 1024 * 1024;
 
     /* Sensitivity, adjusted according to screen size */
     private final double mSensitivityFactor = (1.4 * (1080f/ Tools.getDisplayMetrics((Activity) getContext()).heightPixels));
@@ -299,7 +300,9 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
         MCOptionUtils.save();
         getMcScale();
 
-        new Thread(() -> {
+        // The JVM runs the game on this thread. A big stack keeps deep recursion in mods and in
+        // world generation from overflowing it and taking the whole game down.
+        new Thread(null, () -> {
             try {
                 // Wait until the listener is attached
                 synchronized(mSurfaceReadyListenerLock) {
@@ -310,7 +313,7 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
             } catch (Throwable e) {
                 Tools.showError(getContext(), e, true);
             }
-        }, "JVM Main thread").start();
+        }, "JVM Main thread", JVM_MAIN_THREAD_STACK_SIZE).start();
     }
 
     @Override

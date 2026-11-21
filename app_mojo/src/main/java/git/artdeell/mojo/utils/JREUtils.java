@@ -17,49 +17,91 @@ import git.artdeell.mojo.utils.plugins.LibraryPlugin;
 import git.artdeell.mojo.prefs.*;
 
 public class JREUtils {
+    private static final int LOGCAT_MAX_RESTARTS = 10;
+    private static final int LOGCAT_BATCH_SIZE = 4096;
+
     public static void redirectAndPrintJRELog() {
         Log.v("jrelog","Log starts here");
-        new Thread(new Runnable(){
-            int failTime = 0;
-            ProcessBuilder logcatPb;
-            @Override
-            public void run() {
-                try {
-                    if (logcatPb == null) {
-                        // No filtering by tag anymore as that relied on incorrect log levels set in log.h
-                        logcatPb = new ProcessBuilder().command("logcat", /* "-G", "1mb", */ "-v", "brief", "-s", "jrelog", "LIBGL", "NativeInput").redirectErrorStream(true);
-                    }
+        // A daemon thread with a low priority, so the log never competes with the game and never
+        // keeps the process alive after the game is gone
+        Thread logThread = new Thread(JREUtils::pumpLogcat, "JRE logcat");
+        logThread.setDaemon(true);
+        logThread.setPriority(Thread.MIN_PRIORITY);
+        logThread.start();
+        Log.i("jrelog-logcat","Logcat thread started");
+    }
 
-                    Log.i("jrelog-logcat","Clearing logcat");
-                    new ProcessBuilder().command("logcat", "-c").redirectErrorStream(true).start();
-                    Log.i("jrelog-logcat","Starting logcat");
-                    java.lang.Process p = logcatPb.start();
+    private static void clearLogcat() {
+        java.lang.Process clear = null;
+        try {
+            clear = new ProcessBuilder().command("logcat", "-c").redirectErrorStream(true).start();
+            // Collect the exit code, otherwise every call leaves a zombie process behind
+            clear.waitFor();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Throwable e) {
+            Log.w("jrelog-logcat", "Failed to clear logcat", e);
+        } finally {
+            if (clear != null) clear.destroy();
+        }
+    }
 
-                    byte[] buf = new byte[1024];
-                    int len;
-                    while ((len = p.getInputStream().read(buf)) != -1) {
-                        String currStr = new String(buf, 0, len);
-                        Logger.appendToLog(currStr);
-                    }
+    private static void flushLogBatch(StringBuilder batch) {
+        int length = batch.length();
+        if (length == 0) return;
+        // appendToLog adds its own line break
+        if (batch.charAt(length - 1) == '\n') batch.setLength(length - 1);
+        Logger.appendToLog(batch.toString());
+        batch.setLength(0);
+    }
 
-                    if (p.waitFor() != 0) {
-                        Log.e("jrelog-logcat", "Logcat exited with code " + p.exitValue());
-                        failTime++;
-                        Log.i("jrelog-logcat", (failTime <= 10 ? "Restarting logcat" : "Too many restart fails") + " (attempt " + failTime + "/10");
-                        if (failTime <= 10) {
-                            run();
-                        } else {
-                            Logger.appendToLog("ERROR: Unable to get more log.");
+    private static void pumpLogcat() {
+        for (int failTime = 0; failTime <= LOGCAT_MAX_RESTARTS; failTime++) {
+            java.lang.Process logcat = null;
+            try {
+                Log.i("jrelog-logcat", "Clearing logcat");
+                clearLogcat();
+                Log.i("jrelog-logcat", "Starting logcat");
+                // No filtering by tag anymore as that relied on incorrect log levels set in log.h
+                logcat = new ProcessBuilder()
+                        .command("logcat", "-v", "brief", "-s", "jrelog", "LIBGL", "NativeInput")
+                        .redirectErrorStream(true).start();
+
+                // Lines are read as UTF-8 text, so a multi-byte character is never cut in half,
+                // and they are sent in batches so a flood of messages does not flood the JNI
+                StringBuilder batch = new StringBuilder(LOGCAT_BATCH_SIZE + 256);
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(logcat.getInputStream(), java.nio.charset.StandardCharsets.UTF_8), 8192)) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        batch.append(line).append('\n');
+                        if (batch.length() >= LOGCAT_BATCH_SIZE || !reader.ready()) {
+                            flushLogBatch(batch);
                         }
                     }
-                } catch (Throwable e) {
-                    Log.e("jrelog-logcat", "Exception on logging thread", e);
-                    Logger.appendToLog("Exception on logging thread:\n" + Log.getStackTraceString(e));
+                    flushLogBatch(batch);
                 }
-            }
-        }).start();
-        Log.i("jrelog-logcat","Logcat thread started");
 
+                int exitCode = logcat.waitFor();
+                if (exitCode == 0) return;
+                Log.e("jrelog-logcat", "Logcat exited with code " + exitCode);
+                if (failTime < LOGCAT_MAX_RESTARTS) {
+                    Log.i("jrelog-logcat", "Restarting logcat (attempt " + (failTime + 1) + "/" + LOGCAT_MAX_RESTARTS + ")");
+                    // Do not restart in a tight loop if logcat keeps failing
+                    Thread.sleep(1000);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Throwable e) {
+                Log.e("jrelog-logcat", "Exception on logging thread", e);
+                Logger.appendToLog("Exception on logging thread:\n" + Log.getStackTraceString(e));
+                return;
+            } finally {
+                if (logcat != null) logcat.destroy();
+            }
+        }
+        Logger.appendToLog("ERROR: Unable to get more log.");
     }
 
     private static void overrideEnvVars(Map<String, String> envMap) throws IOException {

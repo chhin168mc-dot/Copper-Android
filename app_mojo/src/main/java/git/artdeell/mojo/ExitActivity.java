@@ -14,6 +14,9 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 @Keep
 public class ExitActivity extends AppCompatActivity {
 
@@ -54,26 +57,33 @@ public class ExitActivity extends AppCompatActivity {
             return;
         }
 
-        Object lock = new Object();
+        // A latch keeps the notification even if the UI thread is faster than this thread. With
+        // wait/notify the notification could be lost and this thread would wait forever, which left
+        // a dead game process behind that blocked the next launch until the app was closed by hand.
+        final CountDownLatch launched = new CountDownLatch(1);
         Tools.runOnUiThread(()->{
-            Intent i = new Intent(ctx,ExitActivity.class);
-            i.putExtra("code",code);
-            i.putExtra("isSignal", isSignal);
-            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            ctx.startActivity(i);
-            synchronized (lock) {
-                lock.notify();
+            try {
+                Intent i = new Intent(ctx,ExitActivity.class);
+                i.putExtra("code",code);
+                i.putExtra("isSignal", isSignal);
+                i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+            } catch (Throwable t) {
+                Log.e("ExitActivity", "Failed to show the exit dialog", t);
+            } finally {
+                launched.countDown();
             }
         });
-        synchronized (lock) {
-            try {
-                lock.wait();
-            } catch (InterruptedException e) {
-                Log.e("ExitActivity", "Waiting on lock failed: "+e);
-            }
+        try {
+            // Do not wait forever when the UI thread is stuck, the process has to exit in any case
+            launched.await(3, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Log.e("ExitActivity", "Waiting on the exit dialog failed: "+e);
         }
         System.exit(0);
+        // Make sure that no half-dead game process survives if exit hooks of the VM do not return
+        Tools.fullyExit();
     }
 
 }

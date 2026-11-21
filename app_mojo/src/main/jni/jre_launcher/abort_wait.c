@@ -38,26 +38,35 @@ _Noreturn static void callExit() {
     // This will call System.exit()
     (*env)->CallStaticVoidMethod(env, vm_exit_data.exit_class, vm_exit_data.exit_method,
                                  vm_exit_data.context, abort_info.code, abort_info.is_signal);
-    while (true) {}
+    // Never return, but do not burn a CPU core while the process is going down
+    while (true) { sleep(3600); }
 }
 
 static void* abort_wait(void* unused) {
-    syscall(SYS_futex, &futex_word, FUTEX_WAIT, 1, NULL);
+    // FUTEX_WAIT also returns when a signal interrupts it (the JVM and Android both use signals).
+    // Without the check an interrupted wait exited the game although nothing had crashed.
+    while (__atomic_load_n(&futex_word, __ATOMIC_ACQUIRE) == 1) {
+        syscall(SYS_futex, &futex_word, FUTEX_WAIT, 1, NULL);
+    }
     callExit();
     return NULL;
 }
 
 void setup_abort_wait() {
     pthread_t abort_thread;
-    pthread_create(&abort_thread, NULL, abort_wait, NULL);
+    if(pthread_create(&abort_thread, NULL, abort_wait, NULL) == 0) {
+        pthread_detach(abort_thread);
+    }
 }
 
 _Noreturn void abort_call(int code, bool is_signal) {
     abort_info.code = code;
     abort_info.is_signal = is_signal;
-    futex_word = 0;
-    syscall(SYS_futex, &futex_word, FUTEX_WAKE, NULL);
-    while(true) {}
+    __atomic_store_n(&futex_word, 0, __ATOMIC_RELEASE);
+    syscall(SYS_futex, &futex_word, FUTEX_WAKE, 1);
+    // The calling thread must not return into the VM. Sleep instead of spinning at 100% CPU,
+    // the exit thread ends the process.
+    while(true) { sleep(3600); }
 }
 
 JNIEXPORT void JNICALL
