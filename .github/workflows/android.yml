@@ -1,10 +1,10 @@
 name: Android apk
 
 on:
-  push:
+  # push:
   workflow_dispatch:
-  pull_request:
-    types: [labeled]
+  # pull_request:
+    # types: [labeled]
 
 permissions:
   contents: write
