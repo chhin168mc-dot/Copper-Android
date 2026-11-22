@@ -285,12 +285,21 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
     @Override
     public void onLoginDone(Account account) {
         mLoginStep = mMaxSteps;
+        // Cancel any running progress animation so the bar fills and the name appears at once
+        if (mLoginStepAnimator.isRunning()) {
+            mLoginStepAnimator.cancel();
+        }
         invalidate();
 
         Toast.makeText(getContext(), R.string.main_login_done, Toast.LENGTH_SHORT).show();
         Accounts.setCurrent(account);
         // Put the name on the screen right now, reading every account file again can wait
         showAccountNow(account);
+        // Force the view to redraw the selected name immediately (avoids a long blank wait)
+        post(() -> {
+            requestLayout();
+            invalidate();
+        });
         refreshSkinFace(account);
     }
 
@@ -307,7 +316,11 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
             mAdapter.insert(account, index);
         }
         mAdapter.notifyDataSetChanged();
-        setSelection(index);
+        setSelection(index, false); // false = no animation, name appears instantly
+        // Some devices keep the old spinner text until the next layout pass
+        if (getSelectedView() != null) {
+            getSelectedView().invalidate();
+        }
     }
 
     /** Downloads the head of the account in the background and shows it when it is ready */

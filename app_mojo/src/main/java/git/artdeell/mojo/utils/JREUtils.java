@@ -151,11 +151,15 @@ public class JREUtils {
      * It supports multi line and absence of spaces between arguments
      * The function also supports auto-removal of improper arguments, although it may miss some.
      *
+     * Extra safety: drops empty tokens and obviously invalid -Xmx/-Xms forms that make the
+     * HotSpot JNI layer return JNI_EINVAL ("Bad arguments").
+     *
      * @param args The un-parsed argument list.
      * @return Parsed args as an ArrayList
      */
     public static ArrayList<String> parseJavaArguments(String args){
         ArrayList<String> parsedArguments = new ArrayList<>(0);
+        if (args == null || args.trim().isEmpty()) return parsedArguments;
         args = args.trim().replace(" ", "");
         //For each prefixes, we separate args.
         String[] separators = new String[]{"-XX:-","-XX:+", "-XX:","--", "-D", "-X", "-javaagent:", "-verbose"};
@@ -193,16 +197,37 @@ public class JREUtils {
                             continue;
                         }
                     }
-                    parsedArguments.add(parsedSubString);
+                    if (isSafeJvmArg(parsedSubString)) {
+                        parsedArguments.add(parsedSubString);
+                    } else {
+                        Log.w("JAVA ARGS PARSER", "Removed unsafe/empty argument: " + parsedSubString);
+                    }
                 }
                 // --a-b= handling (with multiple signs so we don't accidentally remove mandatory args)
                 else if(parsedSubString.startsWith("--") && parsedSubString.indexOf('=') != -1) {
-                    parsedArguments.add(parsedSubString);
+                    if (isSafeJvmArg(parsedSubString)) {
+                        parsedArguments.add(parsedSubString);
+                    } else {
+                        Log.w("JAVA ARGS PARSER", "Removed unsafe argument: " + parsedSubString);
+                    }
                 }
                 else Log.w("JAVA ARGS PARSER", "Removed improper arguments: " + parsedSubString);
             }
         }
         return parsedArguments;
+    }
+
+    /** Reject empty tokens and -Xmx / -Xms that have no numeric size (they cause JNI_EINVAL). */
+    private static boolean isSafeJvmArg(String arg) {
+        if (arg == null || arg.isEmpty() || arg.length() < 2) return false;
+        if (arg.startsWith("-Xmx") || arg.startsWith("-Xms")) {
+            // Accept -Xmx2G, -Xmx2048M, -Xmx512 etc. Reject bare -Xmx / -Xms / -XmxM
+            String size = arg.substring(4);
+            if (size.isEmpty()) return false;
+            // must start with a digit
+            return Character.isDigit(size.charAt(0));
+        }
+        return true;
     }
 
     public static int getDetectedVersion() {

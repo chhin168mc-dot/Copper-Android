@@ -56,7 +56,9 @@ public final class JvmTuner {
      */
     public static int getHeapMb() {
         int heap = sHeapMb;
-        return heap > 0 ? heap : LauncherPreferences.PREF_RAM_ALLOCATION;
+        if (heap > 0) return heap;
+        int pref = LauncherPreferences.PREF_RAM_ALLOCATION;
+        return pref >= 256 ? pref : 256;
     }
 
     /**
@@ -70,6 +72,9 @@ public final class JvmTuner {
      * @return the heap size to use, never bigger than requestedMb
      */
     public static int resolveHeap(int requestedMb, int freeDeviceMb, int addressSpaceMb) {
+        // Never allow 0 or tiny heap – that produces "-Xmx0M" / invalid args and the JVM
+        // answers with "Failed to create the Java virtual machine: Bad arguments".
+        if (requestedMb < 256) requestedMb = 256;
         int heap = requestedMb;
         int floor = Math.min(MIN_HEAP_MB, requestedMb);
 
@@ -81,6 +86,7 @@ public final class JvmTuner {
             int limit = addressSpaceMb - ADDRESS_SPACE_MARGIN_MB;
             if (limit < heap) heap = Math.max(floor, limit);
         }
+        if (heap < 256) heap = 256;
 
         Log.i(TAG, "Heap: requested " + requestedMb + " MB, free RAM " + freeDeviceMb
                 + " MB, address space " + addressSpaceMb + " MB -> " + heap + " MB");

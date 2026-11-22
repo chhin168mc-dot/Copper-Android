@@ -95,8 +95,9 @@ public class JavaRunner {
         String resolvFile;
         resolvFile = new File(Tools.DIR_DATA,"resolv.conf").getAbsolutePath();
 
-        // The tuner may have lowered the heap because the device does not have enough free RAM
-        int heapMb = JvmTuner.getHeapMb();
+        // The tuner may have lowered the heap because the device does not have enough free RAM.
+        // Clamp again so we never emit "-Xmx0M" / "-XmxM" which the JVM rejects as Bad arguments.
+        int heapMb = Math.max(256, JvmTuner.getHeapMb());
         userArguments.add(0, "-Xms"+heapMb+"M");
         userArguments.add(0, "-Xmx"+heapMb+"M");
 
