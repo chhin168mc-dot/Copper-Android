@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="login_session_expired_title">Sign in again</string>
-    <string name="login_session_expired">Your login has expired or was revoked by the account service. Please sign in again to continue.</string>
-    <string name="login_session_expired_action">Sign in</string>
-    <string name="login_server_unavailable">The login server is not available right now (HTTP %d). Please try again in a moment.</string>
-</resources>

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="login_session_expired_title">ចូលគណនីម្តងទៀត</string>
-    <string name="login_session_expired">ការចូលគណនីរបស់អ្នកបានផុតកំណត់ ឬត្រូវបានលុបចោលដោយសេវាគណនី។ សូមចូលគណនីម្តងទៀតដើម្បីបន្ត។</string>
-    <string name="login_session_expired_action">ចូលគណនី</string>
-    <string name="login_server_unavailable">ម៉ាស៊ីនមេចូលគណនីមិនអាចប្រើបានឥឡូវនេះទេ (HTTP %d)។ សូមព្យាយាមម្តងទៀតបន្តិចក្រោយ។</string>
-</resources>
