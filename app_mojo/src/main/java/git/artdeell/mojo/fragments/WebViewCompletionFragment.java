@@ -17,6 +17,7 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
 import git.artdeell.mojo.R;
+import git.artdeell.mojo.utils.ThemeColors;
 
 public abstract class WebViewCompletionFragment extends Fragment {
     private final String mTrackedUrl;
@@ -25,6 +26,11 @@ public abstract class WebViewCompletionFragment extends Fragment {
     // Technically the client is blank (or there is none) when the fragment is initialized
     private boolean mBlankClient = true;
     private boolean mIsCompleted = false;
+    private boolean mRevealed = false;
+    /** The page is shown after this time even if the WebView never reported that it has something to show */
+    private static final long REVEAL_TIMEOUT_MS = 5000L;
+    private static final long REVEAL_FADE_MS = 150L;
+    private final Runnable mRevealRunnable = this::reveal;
 
     protected WebViewCompletionFragment(String mTrackedUrl, String mAuthUrl) {
         this.mTrackedUrl = mTrackedUrl;
@@ -34,6 +40,12 @@ public abstract class WebViewCompletionFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         mWebview = (WebView) inflater.inflate(R.layout.fragment_microsoft_login, container, false);
+        // A WebView with nothing loaded yet is white. It takes the color of the launcher instead,
+        // and stays invisible until the first page has something to show, then it fades in.
+        mWebview.setBackgroundColor(ThemeColors.surface(inflater.getContext()));
+        mWebview.setAlpha(0f);
+        mRevealed = false;
+        mWebview.postDelayed(mRevealRunnable, REVEAL_TIMEOUT_MS);
         mWebview.requestFocus();
         mWebview.setOnFocusChangeListener((v,f)->{
             if(!f) mWebview.requestFocus();
@@ -58,13 +70,30 @@ public abstract class WebViewCompletionFragment extends Fragment {
 
     private void startNewSession() {
         CookieManager.getInstance().removeAllCookies((b)->{
+            // The disk cache only holds public page files, clearing it on the main thread made the
+            // login page wait for it. The cookies and the stored data are what keeps a session.
             mWebview.clearHistory();
-            mWebview.clearCache(true);
             mWebview.clearFormData();
-            mWebview.clearHistory();
             WebStorage.getInstance().deleteAllData();
             mWebview.loadUrl(mAuthUrl);
         });
+    }
+
+    /** Fades the page in. Safe to call more than once. */
+    private void reveal() {
+        if(mRevealed || mWebview == null) return;
+        mRevealed = true;
+        mWebview.removeCallbacks(mRevealRunnable);
+        mWebview.animate().alpha(1f).setDuration(REVEAL_FADE_MS).start();
+    }
+
+    @Override
+    public void onDestroyView() {
+        if(mWebview != null) {
+            mWebview.removeCallbacks(mRevealRunnable);
+            mWebview.animate().cancel();
+        }
+        super.onDestroyView();
     }
 
     private void restoreWebViewState(Bundle savedInstanceState) {
@@ -119,10 +148,26 @@ public abstract class WebViewCompletionFragment extends Fragment {
         public void onPageStarted(WebView view, String url, Bitmap favicon) {}
 
         @Override
+        public void onPageCommitVisible(WebView view, String url) {
+            super.onPageCommitVisible(view, url);
+            if(!url.startsWith(mTrackedUrl)) reveal();
+        }
+
+        @Override
         public void onPageFinished(WebView view, String url) {
             if(url.startsWith(mTrackedUrl)) {
                 internalSignalCompletion(url);
+            } else {
+                reveal();
             }
+        }
+
+        @Override
+        public void onReceivedError(WebView view, android.webkit.WebResourceRequest request,
+                                    android.webkit.WebResourceError error) {
+            super.onReceivedError(view, request, error);
+            // The error page of the WebView has to be seen, there is nothing else to wait for
+            if(request != null && request.isForMainFrame()) reveal();
         }
     }
 

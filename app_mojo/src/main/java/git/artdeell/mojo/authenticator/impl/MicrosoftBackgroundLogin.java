@@ -102,7 +102,7 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
         acc.authType = AuthType.MICROSOFT;
         acc.refreshToken = msRefreshToken;
         acc.expiresAt = expiresAt;
-        acc.updateSkinFace();
+        // The head is downloaded by the account list after the name is on the screen
     }
 
     @Override

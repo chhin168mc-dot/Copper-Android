@@ -227,15 +227,44 @@ public class MoJsonDownloader extends Downloader {
         }
     }
 
+    /** Describes the archives the natives come from, so an extraction that was already done can be skipped */
+    private String createNativesStamp() {
+        StringBuilder builder = new StringBuilder();
+        for(NativeLibraryExtractable extractable : mDeclaredNatives) {
+            File archive = extractable.path;
+            builder.append(archive.getPath()).append('|')
+                    .append(archive.length()).append('|')
+                    .append(archive.lastModified()).append('\n');
+        }
+        return builder.toString();
+    }
+
+    private static boolean isNativesStampCurrent(File stampFile, String stamp) {
+        if(!stampFile.isFile()) return false;
+        try {
+            return stamp.equals(org.apache.commons.io.FileUtils.readFileToString(stampFile, java.nio.charset.StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     private void extractNatives(String versionName) throws IOException {
         if(mDeclaredNatives.isEmpty()) return;
         int totalCount = mDeclaredNatives.size();
 
+        File targetDirectory = new File(Tools.DIR_CACHE, "natives/"+versionName);
+        FileUtils.ensureDirectory(targetDirectory);
+        // Every launch opened each native archive and read every file again to compare it. When the
+        // archives are the same as at the last extraction, the files are already in place.
+        File stampFile = new File(targetDirectory, ".natives-stamp");
+        String stamp = createNativesStamp();
+        if(isNativesStampCurrent(stampFile, stamp)) return;
+        //noinspection ResultOfMethodCallIgnored
+        stampFile.delete();
+
         ProgressLayout.setProgress(ProgressLayout.DOWNLOAD_GAME, 0,
                 R.string.newdl_extracting_native_libraries, 0, totalCount);
 
-        File targetDirectory = new File(Tools.DIR_CACHE, "natives/"+versionName);
-        FileUtils.ensureDirectory(targetDirectory);
         NativesExtractor nativesExtractor = new NativesExtractor(targetDirectory);
         int extractedCount = 0;
         for(NativeLibraryExtractable extractable : mDeclaredNatives) {
@@ -245,6 +274,7 @@ public class MoJsonDownloader extends Downloader {
             ProgressLayout.setProgress(ProgressLayout.DOWNLOAD_GAME, extractedCount * 100 / totalCount,
                     R.string.newdl_extracting_native_libraries, extractedCount, totalCount);
         }
+        org.apache.commons.io.FileUtils.writeStringToFile(stampFile, stamp, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private File downloadGameJson(JVersionList.Version verInfo) throws IOException, PresentableException, MirrorTamperedException {

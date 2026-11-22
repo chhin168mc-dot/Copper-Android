@@ -17,7 +17,12 @@ import android.os.Build;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.system.Os;
+import android.os.Looper;
 import android.view.View;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.webkit.CookieManager;
+import android.webkit.WebView;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
@@ -291,6 +296,7 @@ public class LauncherActivity extends BaseActivity {
         }
 
         IconCacheJanitor.runJanitor();
+        warmUpWebView();
 
         // Not null: with no background nothing clears the pixels behind a see-through screen or a hidden
         // wallpaper, and the old ones show through and smear. A solid color costs next to nothing.
@@ -343,6 +349,33 @@ public class LauncherActivity extends BaseActivity {
         if(instance == null) return false;
         Instances.setSelectedInstance(instance);
         return true;
+    }
+
+    /**
+     * The first WebView of a process takes a while to start (the browser engine is loaded then), and
+     * that wait was spent in front of the login page. It is paid for here, while the launcher is idle.
+     */
+    private void warmUpWebView() {
+        Looper.myQueue().addIdleHandler(() -> {
+            try {
+                WebView warm = new WebView(getApplicationContext());
+                CookieManager.getInstance();
+                warm.destroy();
+            } catch (Throwable e) {
+                // No WebView on this device, the login screens report that themselves
+            }
+            return false;
+        });
+    }
+
+    /** The system bars slide in when a popup or a dialog takes the focus, hide them when the launcher has it back */
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if(!hasFocus || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return;
+        if(isInMultiWindowMode()) return;
+        WindowInsetsController controller = getWindow().getInsetsController();
+        if(controller != null) controller.hide(WindowInsets.Type.systemBars());
     }
 
     @Override

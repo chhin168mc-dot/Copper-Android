@@ -13,6 +13,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -20,6 +21,10 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
@@ -284,7 +289,87 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
 
         Toast.makeText(getContext(), R.string.main_login_done, Toast.LENGTH_SHORT).show();
         Accounts.setCurrent(account);
-        reload();
+        // Put the name on the screen right now, reading every account file again can wait
+        showAccountNow(account);
+        refreshSkinFace(account);
+    }
+
+    /** Adds the account to the list (or swaps its entry) and selects it without a trip to the disk */
+    private void showAccountNow(@NonNull Account account) {
+        int index = mAdapter.indexOfSaved(account);
+        mAdapter.setNotifyOnChange(false);
+        if(index < 0) {
+            mAdapter.add(account);
+            index = mAdapter.getCount() - 1;
+        } else {
+            Account old = mAdapter.getItem(index);
+            mAdapter.remove(old);
+            mAdapter.insert(account, index);
+        }
+        mAdapter.notifyDataSetChanged();
+        setSelection(index);
+    }
+
+    /** Downloads the head of the account in the background and shows it when it is ready */
+    private void refreshSkinFace(@NonNull Account account) {
+        MojoApplication.sExecutorService.execute(() -> {
+            account.updateSkinFace();
+            Tools.runOnUiThread(mAdapter::invalidateHeads);
+        });
+    }
+
+    /* The popup list is its own window. When it takes the focus the system bars slide back in, so it hides them again */
+    private ViewGroup mPopupList;
+
+    private void keepPopupImmersive(@Nullable ViewGroup list) {
+        // The parent is null while the popup measures its width, and it is the spinner itself in some calls
+        if(list == null || list == this || mPopupList == list) return;
+        mPopupList = list;
+        list.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(@NonNull View v) {
+                hideSystemBarsOf(v);
+                v.post(() -> hideSystemBarsOf(v));
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(@NonNull View v) {}
+        });
+        if(list.isAttachedToWindow()) hideSystemBarsOf(list);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void hideSystemBarsOf(@NonNull View view) {
+        if(!view.isAttachedToWindow()) return;
+        FragmentActivity activity = findActivity(getContext());
+        // In a window the bars belong to the window, they are not hidden there
+        if(activity == null || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInMultiWindowMode())) return;
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsetsController controller = view.getWindowInsetsController();
+            if(controller == null) return;
+            controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            controller.hide(WindowInsets.Type.systemBars());
+        } else {
+            view.getRootView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+        }
+    }
+
+    /** Shows a dialog without the system bars coming back: it takes the focus only after they are hidden */
+    private void showDialogImmersive(@NonNull MaterialAlertDialogBuilder builder) {
+        AlertDialog dialog = builder.create();
+        Window window = dialog.getWindow();
+        if(window != null) window.setFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        dialog.show();
+        if(window != null) {
+            hideSystemBarsOf(window.getDecorView());
+            window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        }
     }
 
 
@@ -313,12 +398,11 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
      * anything about, offer to sign in again right away.
      */
     private void showSessionExpired(Context context, AuthType authType) {
-        new MaterialAlertDialogBuilder(context)
+        showDialogImmersive(new MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.login_session_expired_title)
                 .setMessage(R.string.login_session_expired)
                 .setPositiveButton(R.string.login_session_expired_action, (dialog, which) -> startRelogin(authType))
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                .setNegativeButton(android.R.string.cancel, null));
     }
 
     private void startRelogin(AuthType authType) {
@@ -394,11 +478,28 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
 
         @Override
         public View getDropDownView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
+            keepPopupImmersive(parent);
             if(convertView == null) {
                 convertView = mInflater.inflate(R.layout.item_account, parent, false);
             }
             populateView(convertView, position, true);
             return convertView;
+        }
+
+        /** @return the position of the entry that is stored in the same file as the account, or -1 */
+        int indexOfSaved(@NonNull Account account) {
+            for(int i = 1; i < getCount(); i++) {
+                Account item = getItem(i);
+                if(item != null && item.getSaveLocation() != null
+                        && item.getSaveLocation().equals(account.getSaveLocation())) return i;
+            }
+            return -1;
+        }
+
+        /** Forgets the heads that were drawn, they are read from the disk again */
+        void invalidateHeads() {
+            mSkinHeadCache.clear();
+            notifyDataSetChanged();
         }
 
         private void populateView(View view, int position, boolean isDropDown) {
@@ -462,15 +563,14 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
         }
 
         private void showDeleteDialog(Context context, int position) {
-            new MaterialAlertDialogBuilder(context)
+            showDialogImmersive(new MaterialAlertDialogBuilder(context)
                     .setMessage(R.string.warning_remove_account)
                     .setPositiveButton(android.R.string.cancel, null)
                     .setNeutralButton(R.string.global_delete, (dialog, which) -> {
                         Account account = getItem(position);
                         Accounts.delete(account);
                         reload();
-                    })
-                    .show();
+                    }));
         }
     }
 }

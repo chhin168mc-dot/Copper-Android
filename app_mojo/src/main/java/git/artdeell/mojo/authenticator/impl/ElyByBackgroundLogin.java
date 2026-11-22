@@ -64,7 +64,7 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
         acc.username = mAccountInfo.username;
         acc.profileId = mAccountInfo.uuid;
         acc.xuid = null;
-        acc.updateSkinFace();
+        // The head is downloaded by the account list after the name is on the screen
     }
 
     @Override

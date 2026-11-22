@@ -59,6 +59,7 @@ public class Account {
             try(FileOutputStream fileOutputStream = new FileOutputStream(skinFile)) {
                 skinFace.compress(Bitmap.CompressFormat.WEBP, 90, fileOutputStream);
             }
+            mFaceCache = null;
             Log.i("SkinLoader", "Update skin face success");
         } catch (IOException e) {
             // Skin refresh limit, no internet connection, etc...
