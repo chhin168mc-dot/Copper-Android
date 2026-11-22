@@ -153,16 +153,6 @@ public final class JvmTuner {
         addIfAbsent(args, "UsePerfData", "-XX:-UsePerfData");
         // Compiler threads steal the CPU from the game when there are only few cores
         if (cores <= 4) addIfAbsent(args, "CICompilerCount", "-XX:CICompilerCount=2");
-
-        // A runtime that does not know one of the flags below must still start the game
-        addIfAbsent(args, "IgnoreUnrecognizedVMOptions", "-XX:+IgnoreUnrecognizedVMOptions");
-        // Every class of the game and of the mods is checked by the verifier when it loads. The
-        // jars come from the version manifest and the mod folder, so on a phone the check only
-        // adds seconds to the start and to the first load of a world.
-        addIfAbsent(args, "BytecodeVerificationRemote", "-XX:-BytecodeVerificationRemote");
-        // World generation and chunk code have very long methods. HotSpot keeps running those in
-        // the interpreter by default, which is what makes a world load slowly.
-        addIfAbsent(args, "DontCompileHugeMethods", "-XX:-DontCompileHugeMethods");
     }
 
     private static void addIfAbsent(List<String> args, String key, String flag) {
