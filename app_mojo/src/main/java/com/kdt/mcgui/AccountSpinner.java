@@ -39,12 +39,15 @@ import git.artdeell.mojo.MojoApplication;
 import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.authenticator.AuthType;
 import git.artdeell.mojo.authenticator.BackgroundLogin;
+import git.artdeell.mojo.authenticator.SessionExpiredException;
 import git.artdeell.mojo.authenticator.accounts.Accounts;
 import git.artdeell.mojo.authenticator.accounts.Account;
 import git.artdeell.mojo.authenticator.listener.LoginListener;
 import git.artdeell.mojo.extra.ExtraConstants;
 import git.artdeell.mojo.extra.ExtraCore;
 import git.artdeell.mojo.extra.ExtraListener;
+import git.artdeell.mojo.fragments.ElyByLoginFragment;
+import git.artdeell.mojo.fragments.MicrosoftLoginFragment;
 import git.artdeell.mojo.progresskeeper.ProgressKeeper;
 import git.artdeell.mojo.skins.SkinEditorFragment;
 
@@ -298,7 +301,38 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
             if(state != Lifecycle.State.RESUMED) return;
         }
 
+        if(errorMessage instanceof SessionExpiredException) {
+            showSessionExpired(context, ((SessionExpiredException) errorMessage).getAuthType());
+            return;
+        }
         Tools.showErrorRemote(errorMessage);
+    }
+
+    /**
+     * The saved login was rejected by the server. Instead of an error that the player cannot do
+     * anything about, offer to sign in again right away.
+     */
+    private void showSessionExpired(Context context, AuthType authType) {
+        new MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.login_session_expired_title)
+                .setMessage(R.string.login_session_expired)
+                .setPositiveButton(R.string.login_session_expired_action, (dialog, which) -> startRelogin(authType))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void startRelogin(AuthType authType) {
+        FragmentActivity activity = findActivity(getContext());
+        if(activity == null || activity.getSupportFragmentManager().isStateSaved()) return;
+        if(!ProgressLayout.ensureNoOngoingTasks(activity, ProgressLayout.AUTHENTICATE)) return;
+        // Open the login page of this kind of account directly, there is no need to ask for the method again
+        if(authType == AuthType.MICROSOFT) {
+            Tools.swapFragment(activity, MicrosoftLoginFragment.class, MicrosoftLoginFragment.TAG, null);
+        } else if(authType == AuthType.ELY_BY) {
+            Tools.swapFragment(activity, ElyByLoginFragment.class, ElyByLoginFragment.TAG, null);
+        } else {
+            createAccount();
+        }
     }
 
     @Override

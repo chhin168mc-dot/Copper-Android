@@ -17,6 +17,7 @@ import org.apache.commons.io.*;
 @SuppressWarnings("IOStreamConstructor")
 public class DownloadUtils {
     public static final String USER_AGENT = Tools.APP_NAME;
+    private static final int COPY_BUFFER_SIZE = 64 * 1024;
 
     public static void download(String url, OutputStream os) throws IOException {
         download(new URL(url), os);
@@ -29,6 +30,7 @@ public class DownloadUtils {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("User-Agent", USER_AGENT);
             conn.setConnectTimeout(10000);
+            conn.setReadTimeout(20000);
             conn.setDoInput(true);
             conn.connect();
             if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
@@ -36,7 +38,11 @@ public class DownloadUtils {
                         + ": " + conn.getResponseMessage());
             }
             is = conn.getInputStream();
-            IOUtils.copy(is, os);
+            byte[] buffer = new byte[COPY_BUFFER_SIZE];
+            int length;
+            while ((length = is.read(buffer)) != -1) {
+                os.write(buffer, 0, length);
+            }
         } catch (IOException e) {
             throw new IOException("Unable to download from " + url, e);
         } finally {
@@ -69,13 +75,16 @@ public class DownloadUtils {
         FileUtils.ensureParentDirectory(outputFile);
 
         HttpURLConnection conn = (HttpURLConnection) new URL(urlInput).openConnection();
+        // Without timeouts a bad connection leaves the download hanging forever
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(20000);
         InputStream readStr = conn.getInputStream();
         try (FileOutputStream fos = new FileOutputStream(outputFile)) {
             int current;
             int overall = 0;
             int length = conn.getContentLength();
 
-            if (buffer == null) buffer = new byte[65535];
+            if (buffer == null) buffer = new byte[COPY_BUFFER_SIZE];
 
             while ((current = readStr.read(buffer)) != -1) {
                 overall += current;

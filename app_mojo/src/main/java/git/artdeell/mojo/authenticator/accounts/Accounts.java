@@ -98,9 +98,25 @@ public class Accounts {
 	public static Account create(Setter setter) throws IOException {
 		Account account = new Account();
 		setter.writeAccount(account);
-		account.mSaveLocation = pickAccountPath();
+		// Signing in again with an account that is already saved updates it. Otherwise every
+		// re-login (for example after the session expired) left one more copy of it in the list.
+		File existing = findSavedAccount(account);
+		account.mSaveLocation = existing != null ? existing : pickAccountPath();
 		account.save();
 		return account;
+	}
+
+	private static File findSavedAccount(Account fresh) {
+		if(fresh.authType == null || fresh.authType == AuthType.LOCAL || fresh.profileId == null) return null;
+		File[] accountFiles = new File(Tools.DIR_ACCOUNT_NEW).listFiles();
+		if(accountFiles == null) return null;
+		for(File accFile : accountFiles) {
+			Account saved = loadAccount(accFile);
+			if(saved != null && saved.authType == fresh.authType && fresh.profileId.equals(saved.profileId)) {
+				return accFile;
+			}
+		}
+		return null;
 	}
 
 	public static void setCurrent(Account account) {

@@ -8,6 +8,7 @@ import androidx.annotation.NonNull;
 
 import com.kdt.mcgui.ProgressLayout;
 
+import git.artdeell.mojo.R;
 import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.authenticator.AuthType;
 import git.artdeell.mojo.authenticator.BackgroundLogin;
@@ -18,8 +19,6 @@ import git.artdeell.mojo.authenticator.model.OAuthTokenResponse;
 import git.artdeell.mojo.utils.PresentableException;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.Callable;
 
@@ -49,10 +48,11 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
                 mAccountInfo = acquireAccountData(mOAuthData.accessToken);
                 continuation.call();
             }catch (Exception e){
-                Log.e("MicroAuth", "Exception thrown during authentication", e);
+                Log.e("ElyByAuth", "Exception thrown during authentication", e);
                 Tools.runOnUiThread(()->loginListener.onLoginError(e));
+            } finally {
+                ProgressLayout.clearProgress(ProgressLayout.AUTHENTICATE);
             }
-            ProgressLayout.clearProgress(ProgressLayout.AUTHENTICATE);
         });
     }
 
@@ -69,6 +69,11 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
 
     @Override
     public void createAccount(@NonNull LoginListener loginListener, String code) {
+        // The same code must not be exchanged twice, the second try fails with "Bad Request"
+        if(!CommonLoginUtils.claimAuthCode(code)) {
+            Log.w("ElyByAuth", "This authorization code was already used, ignoring it");
+            return;
+        }
         acquireAccountDetails(loginListener, ()->{
             Account account = Accounts.create(this::fillAccount);
             Tools.runOnUiThread(() -> loginListener.onLoginDone(account));
@@ -88,7 +93,7 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
 
     private void acquireTokens(boolean isRefresh, String code) throws IOException, PresentableException {
         URL url = new URL(authTokenUrl);
-        Log.i("MicrosoftLogin", "isRefresh=" + isRefresh + ", authCode= "+code);
+        Log.i("ElyByAuth", "isRefresh=" + isRefresh);
 
         String formData = CommonLoginUtils.convertToFormData(
                 "client_id", "mojolauncher2",
@@ -97,25 +102,25 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
                 isRefresh ? "refresh_token" : "code", code,
                 "grant_type", isRefresh ? "refresh_token" : "authorization_code"
         );
-        mOAuthData = CommonLoginUtils.exchangeAuthCode(url, formData);
-        mExpiresAt = mOAuthData.expiresIn*1000 + System.currentTimeMillis();
+        mOAuthData = CommonLoginUtils.exchangeAuthCode(url, formData, isRefresh, AuthType.ELY_BY);
+        // A refresh answer may not carry a new refresh token. The old one stays valid then, and it
+        // has to be kept: with the token lost, every next refresh failed with "Bad Request".
+        if(isRefresh && (mOAuthData.refreshToken == null || mOAuthData.refreshToken.isEmpty())) {
+            mOAuthData.refreshToken = code;
+        }
+        mExpiresAt = CommonLoginUtils.expiryTime(mOAuthData.expiresIn * 1000);
     }
 
     private ElyAccountInfo acquireAccountData(String accessToken) throws IOException, PresentableException {
-        URL url = new URL(accountInfoUrl);
-        HttpURLConnection conn = (HttpURLConnection)url.openConnection();
-        conn.setRequestProperty("Authorization", "Bearer " + accessToken);
-        conn.setUseCaches(false);
-        conn.connect();
-        if(conn.getResponseCode() >= 200 && conn.getResponseCode() < 300) {
-            try (InputStreamReader reader = new InputStreamReader(conn.getInputStream())) {
-                return Tools.GLOBAL_GSON.fromJson(reader, ElyAccountInfo.class);
-            } finally {
-                conn.disconnect();
-            }
-        }else{
-            throw CommonLoginUtils.getResponseThrowable(conn);
+        CommonLoginUtils.HttpResult result = CommonLoginUtils.execute(
+                new URL(accountInfoUrl), "GET", null, null, accessToken);
+        if(!result.isSuccess()) throw CommonLoginUtils.failure(result);
+
+        ElyAccountInfo info = Tools.GLOBAL_GSON.fromJson(result.body, ElyAccountInfo.class);
+        if(info == null || info.uuid == null || info.username == null) {
+            throw new PresentableException(R.string.global_error, R.string.microsoft_login_generic, "empty account info");
         }
+        return info;
     }
 
     private void notifyProgress(LoginListener listener, int step) {

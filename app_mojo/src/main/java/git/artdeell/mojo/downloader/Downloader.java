@@ -31,6 +31,12 @@ import git.artdeell.mojo.utils.FileUtils;
 
 public class Downloader {
     private static final double ONE_MEGABYTE = (1024d * 1024d);
+    // Most of the files (assets, libraries) are small, so the time is lost on the request itself and
+    // not on the transfer. More files in flight keep a fast connection (WiFi, 5G) busy.
+    private static final int DOWNLOAD_THREADS = 16;
+    private static final int METADATA_THREADS = 8;
+    private static final int BUFFER_SIZE = 64 * 1024;
+    private static final int CONNECT_TIMEOUT_MS = 10000;
     private static final ThreadLocal<byte[]> sThreadLocalBuffer = new ThreadLocal<>();
     protected static final File sPartFileDir = new File(Tools.DIR_GAME_HOME, "partfiles");
     private final String mProgressKey;
@@ -63,7 +69,7 @@ public class Downloader {
         mThreadException.set(null);
         mDownloadedFileCounter.set(0);
         mDownloadedSizeCounter.set(0);
-        mDownloadService = Executors.newFixedThreadPool(6);
+        mDownloadService = Executors.newFixedThreadPool(DOWNLOAD_THREADS);
         int verifyThreads = Math.max(2, Runtime.getRuntime().availableProcessors());
         mVerifyService = Executors.newFixedThreadPool(verifyThreads, r -> {
             Thread thread = new Thread(r);
@@ -103,7 +109,7 @@ public class Downloader {
             reducedList.add(element);
         }
         if(reducedList.isEmpty()) return;
-        try (ExecutorService executorService = Executors.newFixedThreadPool(4)) {
+        try (ExecutorService executorService = Executors.newFixedThreadPool(METADATA_THREADS)) {
             for(TaskMetadata element : reducedList) executorService.submit(new CompleteMetadataTask(element, this));
             executorService.shutdown();
             while (!executorService.awaitTermination(33, TimeUnit.MILLISECONDS)) {
@@ -170,6 +176,8 @@ public class Downloader {
 
     private static HttpURLConnection openConnection(URL url) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        // Without a connect timeout a dead WiFi or a server that does not answer blocks the download
+        connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
         connection.setReadTimeout(10000);
         connection.setRequestProperty("User-Agent", DownloadUtils.USER_AGENT);
         connection.setDoInput(true);
@@ -243,7 +251,7 @@ public class Downloader {
     public static byte[] getBuffer() {
         byte[] buffer = sThreadLocalBuffer.get();
         if(buffer == null) {
-            buffer = new byte[8192];
+            buffer = new byte[BUFFER_SIZE];
             sThreadLocalBuffer.set(buffer);
         }
         return buffer;

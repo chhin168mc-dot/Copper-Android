@@ -3,12 +3,15 @@ package git.artdeell.mojo.services;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.net.wifi.WifiManager;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.Process;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -24,15 +27,56 @@ import java.lang.ref.WeakReference;
 public class GameService extends Service {
     private static final WeakReference<Service> sGameService = new WeakReference<>(null);
     private final LocalBinder mLocalBinder = new LocalBinder();
+    private WifiManager.WifiLock mWifiLock;
 
     @Override
     public void onCreate() {
         Tools.buildNotificationChannel(getApplicationContext());
+        acquireWifiLock();
+    }
+
+    /**
+     * Asks Android not to put WiFi into power saving mode while the game runs. In the power saving
+     * mode packets wait for the next beacon (up to 100 ms), which shows up as lag and rubber-banding
+     * in multiplayer. Nothing happens on mobile data (4G/5G) or if the device does not support it.
+     */
+    @SuppressWarnings("deprecation")
+    private void acquireWifiLock() {
+        try {
+            WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wifiManager == null) return;
+            int mode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                    ? WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+                    : WifiManager.WIFI_MODE_FULL_HIGH_PERF;
+            WifiManager.WifiLock lock = wifiManager.createWifiLock(mode, "NokorLauncher:game");
+            lock.setReferenceCounted(false);
+            lock.acquire();
+            mWifiLock = lock;
+        } catch (Throwable t) {
+            Log.w("GameService", "Failed to acquire the WiFi lock", t);
+        }
+    }
+
+    private void releaseWifiLock() {
+        WifiManager.WifiLock lock = mWifiLock;
+        mWifiLock = null;
+        try {
+            if (lock != null && lock.isHeld()) lock.release();
+        } catch (Throwable t) {
+            Log.w("GameService", "Failed to release the WiFi lock", t);
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        releaseWifiLock();
+        super.onDestroy();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if(intent != null && intent.getBooleanExtra("kill", false)) {
+            releaseWifiLock();
             stopSelf();
             Process.killProcess(Process.myPid());
             return START_NOT_STICKY;

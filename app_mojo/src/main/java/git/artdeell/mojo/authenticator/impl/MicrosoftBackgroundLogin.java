@@ -24,11 +24,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.ProtocolException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -43,6 +39,9 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
     private static final String mcLoginUrl = "https://api.minecraftservices.com/authentication/login_with_xbox";
     private static final String mcProfileUrl = "https://api.minecraftservices.com/minecraft/profile";
     private static final String mcStoreUrl = "https://api.minecraftservices.com/entitlements/mcstore";
+
+    /** A Minecraft access token lives for a day */
+    private static final long MC_TOKEN_LIFETIME_MS = 86400000L;
 
     private static final Map<Long, Integer> XSTS_ERRORS;
     static {
@@ -108,6 +107,11 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
 
     @Override
     public void createAccount(@NonNull LoginListener loginListener, String code) {
+        // The same code must not be exchanged twice, the second try fails with "Bad Request"
+        if(!CommonLoginUtils.claimAuthCode(code)) {
+            Log.w("MicrosoftLogin", "This authorization code was already used, ignoring it");
+            return;
+        }
         acquireAccountDetails(loginListener, ()->{
             Account account = Accounts.create(this::fillAccount);
             Tools.runOnUiThread(() -> loginListener.onLoginDone(account));
@@ -127,7 +131,7 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
 
     private String acquireAccessToken(boolean isRefresh, String code) throws IOException, PresentableException {
         URL url = new URL(authTokenUrl);
-        Log.i("MicrosoftLogin", "isRefresh=" + isRefresh + ", authCode= "+code);
+        Log.i("MicrosoftLogin", "isRefresh=" + isRefresh);
 
         String formData = CommonLoginUtils.convertToFormData(
                 "client_id", "00000000402b5328",
@@ -137,14 +141,18 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
                 "scope", "service::user.auth.xboxlive.com::MBI_SSL"
         );
 
-        OAuthTokenResponse response = CommonLoginUtils.exchangeAuthCode(url, formData);
-        msRefreshToken = response.refreshToken;
+        OAuthTokenResponse response = CommonLoginUtils.exchangeAuthCode(url, formData, isRefresh, AuthType.MICROSOFT);
+        // If the server does not send a new refresh token, the old one stays valid. Dropping it
+        // would make the next refresh fail with "Bad Request".
+        if(response.refreshToken != null && !response.refreshToken.isEmpty()) {
+            msRefreshToken = response.refreshToken;
+        } else {
+            msRefreshToken = isRefresh ? code : null;
+        }
         return response.accessToken;
     }
 
     private String acquireXBLToken(String accessToken) throws IOException, JSONException, PresentableException {
-        URL url = new URL(xblAuthUrl);
-
         JSONObject data = new JSONObject();
         JSONObject properties = new JSONObject();
         properties.put("AuthMethod", "RPS");
@@ -154,29 +162,14 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
         data.put("RelyingParty", "http://auth.xboxlive.com");
         data.put("TokenType", "JWT");
 
-        String req = data.toString();
-        HttpURLConnection conn = (HttpURLConnection)url.openConnection();
-        setCommonProperties(conn, req);
-        conn.connect();
-
-        try(OutputStream wr = conn.getOutputStream()) {
-            wr.write(req.getBytes(StandardCharsets.UTF_8));
-        }
-        if(conn.getResponseCode() >= 200 && conn.getResponseCode() < 300) {
-            JSONObject jo = new JSONObject(Tools.read(conn.getInputStream()));
-            conn.disconnect();
-            Log.i("MicrosoftLogin","Xbl Token = "+jo.getString("Token"));
-            return jo.getString("Token");
-            //acquireXsts(jo.getString("Token"));
-        }else{
-            throw CommonLoginUtils.getResponseThrowable(conn);
-        }
+        CommonLoginUtils.HttpResult result = CommonLoginUtils.execute(
+                new URL(xblAuthUrl), "POST", "application/json", data.toString(), null);
+        if(!result.isSuccess()) throw CommonLoginUtils.failure(result);
+        return new JSONObject(result.body).getString("Token");
     }
 
     /** @return [uhs, token]*/
     private @NonNull String[] acquireXsts(String xblToken) throws IOException, JSONException, PresentableException {
-        URL url = new URL(xstsAuthUrl);
-
         JSONObject data = new JSONObject();
         JSONObject properties = new JSONObject();
         properties.put("SandboxId", "RETAIL");
@@ -185,110 +178,77 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
         data.put("RelyingParty", "rp://api.minecraftservices.com/");
         data.put("TokenType", "JWT");
 
-        String req = data.toString();
-        Log.i("MicroAuth", req);
-        HttpURLConnection conn = (HttpURLConnection)url.openConnection();
-        setCommonProperties(conn, req);
-        Log.i("MicroAuth", conn.getRequestMethod());
-        conn.connect();
+        CommonLoginUtils.HttpResult result = CommonLoginUtils.execute(
+                new URL(xstsAuthUrl), "POST", "application/json", data.toString(), null);
 
-        try(OutputStream wr = conn.getOutputStream()) {
-            wr.write(req.getBytes(StandardCharsets.UTF_8));
-        }
-
-        if(conn.getResponseCode() >= 200 && conn.getResponseCode() < 300) {
-            JSONObject jo = new JSONObject(Tools.read(conn.getInputStream()));
+        if(result.isSuccess()) {
+            JSONObject jo = new JSONObject(result.body);
             String uhs = jo.getJSONObject("DisplayClaims").getJSONArray("xui").getJSONObject(0).getString("uhs");
             String token = jo.getString("Token");
-            conn.disconnect();
-            Log.i("MicrosoftLogin","Xbl Xsts = " + token + "; Uhs = " + uhs);
             return new String[]{uhs, token};
-            //acquireMinecraftToken(uhs,jo.getString("Token"));
-        }else if(conn.getResponseCode() == 401) {
-            String responseContents = Tools.read(conn.getErrorStream());
-            JSONObject jo = new JSONObject(responseContents);
-            long xerr = jo.optLong("XErr", -1);
-            Integer locale_id = XSTS_ERRORS.get(xerr);
-            if(locale_id != null) {
-                throw new PresentableException(new RuntimeException(responseContents), locale_id);
-            }
-            throw new PresentableException(new RuntimeException(responseContents), R.string.xerr_unknown, xerr);
-        }else{
-            throw CommonLoginUtils.getResponseThrowable(conn);
         }
+        if(result.code == 401) {
+            long xerr = -1;
+            try {
+                xerr = new JSONObject(result.body).optLong("XErr", -1);
+            } catch (JSONException e) {
+                // The body is not the usual error, it is reported as a plain HTTP error below
+            }
+            if(xerr != -1) {
+                Integer locale_id = XSTS_ERRORS.get(xerr);
+                if(locale_id != null) {
+                    throw new PresentableException(new RuntimeException(result.body), locale_id);
+                }
+                throw new PresentableException(new RuntimeException(result.body), R.string.xerr_unknown, xerr);
+            }
+        }
+        throw CommonLoginUtils.failure(result);
     }
 
     private String acquireToken(String xblUhs, String xblXsts) throws IOException, JSONException, PresentableException {
-        URL url = new URL(mcLoginUrl);
-
         JSONObject data = new JSONObject();
         data.put("identityToken", "XBL3.0 x=" + xblUhs + ";" + xblXsts);
 
-        String req = data.toString();
-        HttpURLConnection conn = (HttpURLConnection)url.openConnection();
-        setCommonProperties(conn, req);
-        conn.connect();
+        CommonLoginUtils.HttpResult result = CommonLoginUtils.execute(
+                new URL(mcLoginUrl), "POST", "application/json", data.toString(), null);
+        if(!result.isSuccess()) throw CommonLoginUtils.failure(result);
 
-        try(OutputStream wr = conn.getOutputStream()) {
-            wr.write(req.getBytes(StandardCharsets.UTF_8));
-        }
-
-        if(conn.getResponseCode() >= 200 && conn.getResponseCode() < 300) {
-            expiresAt = System.currentTimeMillis() + 86400000;
-            JSONObject jo = new JSONObject(Tools.read(conn.getInputStream()));
-            conn.disconnect();
-            Log.i("MicrosoftLogin","MC token: "+jo.getString("access_token"));
-            mcToken = jo.getString("access_token");
-            //checkMcProfile(jo.getString("access_token"));
-            return jo.getString("access_token");
-        }else{
-            throw CommonLoginUtils.getResponseThrowable(conn);
-        }
+        mcToken = new JSONObject(result.body).getString("access_token");
+        expiresAt = CommonLoginUtils.expiryTime(MC_TOKEN_LIFETIME_MS);
+        return mcToken;
     }
 
     private void fetchOwnedItems(String mcAccessToken) throws IOException, PresentableException {
-        URL url = new URL(mcStoreUrl);
-
-        HttpURLConnection conn = (HttpURLConnection)url.openConnection();
-        conn.setRequestProperty("Authorization", "Bearer " + mcAccessToken);
-        conn.setUseCaches(false);
-        conn.connect();
-        if(conn.getResponseCode() < 200 || conn.getResponseCode() >= 300) {
-            throw CommonLoginUtils.getResponseThrowable(conn);
-        }
+        CommonLoginUtils.HttpResult result = CommonLoginUtils.execute(
+                new URL(mcStoreUrl), "GET", null, null, mcAccessToken);
+        if(!result.isSuccess()) throw CommonLoginUtils.failure(result);
         // We don't need any data from this request, it just needs to happen in order for
         // the MS servers to work properly. The data from this is practically useless
         // as it does not indicate whether the user owns the game through Game Pass.
     }
 
     private void checkProfile(String mcAccessToken) throws IOException, JSONException, PresentableException {
-        URL url = new URL(mcProfileUrl);
+        CommonLoginUtils.HttpResult result = CommonLoginUtils.execute(
+                new URL(mcProfileUrl), "GET", null, null, mcAccessToken);
 
-        HttpURLConnection conn = (HttpURLConnection)url.openConnection();
-        conn.setRequestProperty("Authorization", "Bearer " + mcAccessToken);
-        conn.setUseCaches(false);
-        conn.connect();
-
-        if(conn.getResponseCode() >= 200 && conn.getResponseCode() < 300) {
-            String s= Tools.read(conn.getInputStream());
-            conn.disconnect();
-            Log.i("MicrosoftLogin","profile:" + s);
-            JSONObject jsonObject = new JSONObject(s);
-            String name = (String) jsonObject.get("name");
-            String uuid = (String) jsonObject.get("id");
+        if(result.isSuccess()) {
+            JSONObject jsonObject = new JSONObject(result.body);
+            String name = jsonObject.getString("name");
+            String uuid = jsonObject.getString("id");
             String uuidDashes = uuid.replaceFirst(
                     "(\\p{XDigit}{8})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}+)", "$1-$2-$3-$4-$5"
             );
             doesOwnGame = true;
-            Log.i("MicrosoftLogin","UserName = " + name);
-            Log.i("MicrosoftLogin","Uuid = " + uuidDashes);
             mcName=name;
             mcUuid=uuidDashes;
-        }else{
+        }else if(result.code == 404) {
             Log.i("MicrosoftLogin","It seems that this Microsoft Account does not own the game.");
             doesOwnGame = false;
-            throw new PresentableException(new RuntimeException(conn.getResponseMessage()), R.string.mc_not_owned);
-            //throwResponseError(conn);
+            throw new PresentableException(new RuntimeException(result.message), R.string.mc_not_owned);
+        }else {
+            // Only a missing profile means that the game is not owned. A server that is busy or an
+            // error of the connection must not be reported as that.
+            throw CommonLoginUtils.failure(result);
         }
     }
 
@@ -296,22 +256,5 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
     private void notifyProgress(LoginListener listener, int step){
         Tools.runOnUiThread(() -> listener.onLoginProgress(step));
         ProgressLayout.setProgress(ProgressLayout.AUTHENTICATE, step*20);
-    }
-
-
-    /** Set common properties for the connection. Given that all requests are POST, interactivity is always enabled */
-    private static void setCommonProperties(HttpURLConnection conn, String formData) {
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("charset", "utf-8");
-        try {
-            conn.setRequestProperty("Content-Length", Integer.toString(formData.getBytes(StandardCharsets.UTF_8).length));
-            conn.setRequestMethod("POST");
-        }catch (ProtocolException e) {
-            Log.e("MicrosoftAuth", e.toString());
-        }
-        conn.setUseCaches(false);
-        conn.setDoInput(true);
-        conn.setDoOutput(true);
     }
 }

@@ -66,6 +66,9 @@ public class MojoApplication extends Application {
 
 	@Override
 	public void onCreate() {
+		// Keep more idle connections for reuse, the downloader runs many requests at once.
+		// This has to be set before the first HTTP request of the process.
+		System.setProperty("http.maxConnections", "24");
 		ContextExecutor.setApplication(this);
 		// Disable fatal errors on gplay. This is necessary so that google can collect crash report data and send it to me
 		// (where i can find the cause and fix it)
