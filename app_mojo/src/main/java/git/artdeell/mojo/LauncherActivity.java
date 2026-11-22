@@ -297,6 +297,7 @@ public class LauncherActivity extends BaseActivity {
 
         IconCacheJanitor.runJanitor();
         warmUpWebView();
+        git.artdeell.mojo.update.UpdateManager.checkOnStartup(this);
 
         // Not null: with no background nothing clears the pixels behind a see-through screen or a hidden
         // wallpaper, and the old ones show through and smear. A solid color costs next to nothing.

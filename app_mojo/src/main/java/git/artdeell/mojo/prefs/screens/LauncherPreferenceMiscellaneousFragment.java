@@ -20,6 +20,7 @@ import git.artdeell.mojo.LauncherActivity;
 import git.artdeell.mojo.MojoApplication;
 import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.tasks.DataMigrator;
+import git.artdeell.mojo.update.UpdateManager;
 
 import org.apache.commons.io.FileUtils;
 
@@ -53,6 +54,12 @@ public class LauncherPreferenceMiscellaneousFragment extends LauncherPreferenceF
         });
         setupCacheClearPreference();
         setupMicrophoneRequestPreference();
+        Preference updatePreference = requirePreference("checkUpdateNow");
+        updatePreference.setSummary(getString(R.string.preference_update_now_description, git.artdeell.mojo.BuildConfig.VERSION_NAME));
+        updatePreference.setOnPreferenceClickListener(preference -> {
+            UpdateManager.checkNow(getLauncherActivity());
+            return true;
+        });
         updateVisibility();
     }
 
