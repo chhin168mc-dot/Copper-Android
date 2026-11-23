@@ -147,7 +147,7 @@ jobs:
           mkdir -p update
           jq -n \
             --argjson code "${{ github.run_number }}" \
-            --arg version "2026.1.0 (build ${{ github.run_number }})" \
+            --arg version "2026.1.1 (build ${{ github.run_number }})" \
             --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg body "Nokor nightly build. Commit: ${{ github.sha }}" \
             --arg uri "$URL" \
