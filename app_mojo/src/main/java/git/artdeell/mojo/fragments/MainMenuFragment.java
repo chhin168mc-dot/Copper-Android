@@ -36,6 +36,13 @@ import com.kdt.mcgui.mcVersionSpinner;
 
 import git.artdeell.mojo.CustomControlsActivity;
 import git.artdeell.mojo.R;
+import git.artdeell.mojo.authenticator.accounts.Account;
+import git.artdeell.mojo.authenticator.accounts.Accounts;
+import android.graphics.BitmapFactory;
+import android.graphics.Bitmap;
+import java.net.URL;
+import git.artdeell.mojo.skins.DefaultSteveSkin;
+import git.artdeell.mojo.skins.PlayerPreviewView;
 
 import git.artdeell.mojo.LauncherActivity;
 import git.artdeell.mojo.Tools;
@@ -523,6 +530,40 @@ public class MainMenuFragment extends Fragment {
         ImageButton mEditProfileButton = view.findViewById(R.id.edit_profile_button);
         Button mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
+        PlayerPreviewView playerPreview = view.findViewById(R.id.home_player_preview);
+        if (playerPreview != null) {
+            // Steve is the immediate fallback; Microsoft and Ely.by skins replace it
+            // asynchronously when the selected account exposes a skin endpoint.
+            playerPreview.setSkin(DefaultSteveSkin.create(), false);
+            Account activeAccount = Accounts.getCurrent();
+            if (activeAccount != null && activeAccount.authType != null
+                    && activeAccount.authType.skinUrl != null
+                    && activeAccount.username != null) {
+                final String skinUrl = String.format(activeAccount.authType.skinUrl, activeAccount.username);
+                final boolean slimModel = false;
+                final android.app.Activity hostActivity = requireActivity();
+                new Thread(() -> {
+                    Bitmap skinBitmap = null;
+                    try (java.io.InputStream input = new URL(skinUrl).openStream()) {
+                        skinBitmap = BitmapFactory.decodeStream(input);
+                    } catch (Exception ignored) { }
+                    if (skinBitmap != null && isAdded()) {
+                        final Bitmap loadedSkin = skinBitmap;
+                        hostActivity.runOnUiThread(() -> {
+                            if (isAdded() && playerPreview.getWindowToken() != null)
+                                playerPreview.setSkin(loadedSkin, slimModel);
+                            else loadedSkin.recycle();
+                        });
+                    }
+                }, "Nokor-Skin-Preview").start();
+            }
+            playerPreview.setAlpha(0f);
+            playerPreview.setScaleX(0.88f);
+            playerPreview.setScaleY(0.88f);
+            playerPreview.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(650L).setStartDelay(140L)
+                    .setInterpolator(new android.view.animation.OvershootInterpolator(0.8f)).start();
+        }
 
         mRightPane = view.findViewById(R.id.right_pane_container);
         mBottomBar = view.findViewById(R.id.bottom_bar);

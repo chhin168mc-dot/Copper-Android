@@ -16,6 +16,16 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <com.kdt.mcgui.SpaceBackgroundView
+        android:id="@+id/space_background"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:alpha="0.96"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <com.kdt.mcgui.AccountSpinner
         android:id="@+id/account_spinner"
         android:layout_width="match_parent"

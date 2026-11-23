@@ -286,6 +286,16 @@ public class LauncherActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         boolean launchFromShortcut = savedInstanceState == null && selectShortcutInstance(getIntent());
         setContentView(R.layout.activity_mojo_ui);
+        View launcherRoot = findViewById(android.R.id.content);
+        if (launcherRoot != null) {
+            launcherRoot.setAlpha(0f);
+            launcherRoot.setScaleX(0.965f);
+            launcherRoot.setScaleY(0.965f);
+            launcherRoot.setTranslationY(18f * getResources().getDisplayMetrics().density);
+            launcherRoot.animate().alpha(1f).scaleX(1f).scaleY(1f).translationY(0f)
+                    .setDuration(520L).setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .start();
+        }
         MoJsonDownloader.prepareSubstitutionMap(getAssets());
 
         try {
