@@ -583,8 +583,6 @@ public class MainMenuFragment extends Fragment {
         mBottomBar = view.findViewById(R.id.bottom_bar);
         mLeftSidebar = view.findViewById(R.id.left_sidebar);
         mLeftPaneContainer = view.findViewById(R.id.left_pane_container);
-        mEditControls = view.findViewById(R.id.home_edit_controls);
-        mAddRightButton = view.findViewById(R.id.home_edit_add_right);
         mPaneGuideline = view.findViewById(R.id.pane_guideline);
         mMenuPanel = view.findViewById(R.id.quick_menu_panel);
         mMenuScrim = view.findViewById(R.id.quick_menu_scrim);
