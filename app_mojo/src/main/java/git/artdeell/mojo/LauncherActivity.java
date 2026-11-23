@@ -42,6 +42,9 @@ import androidx.fragment.app.FragmentManager;
 import com.kdt.mcgui.LauncherWallpaperView;
 import com.kdt.mcgui.ProgressLayout;
 
+import git.artdeell.mojo.space.IntroAnimator;
+import git.artdeell.mojo.space.SpaceBackgroundView;
+
 import git.artdeell.mojo.authenticator.accounts.Accounts;
 import git.artdeell.mojo.extra.ExtraConstants;
 import git.artdeell.mojo.extra.ExtraCore;
@@ -77,6 +80,7 @@ public class LauncherActivity extends BaseActivity {
     private FragmentContainerView mFragmentView;
     private ImageButton mSettingsButton;
     private LauncherWallpaperView mWallpaper;
+    private SpaceBackgroundView mSpace;
     private ProgressLayout mProgressLayout;
     private ProgressServiceKeeper mProgressServiceKeeper;
     private NotificationManager mNotificationManager;
@@ -266,7 +270,10 @@ public class LauncherActivity extends BaseActivity {
     private void applyWallpaperFocus() {
         if(mWallpaper == null) return;
         Fragment current = getSupportFragmentManager().findFragmentById(R.id.container_fragment);
-        mWallpaper.setFocused(current instanceof MainMenuFragment && !((MainMenuFragment) current).isRightPaneActive());
+        boolean atHome = current instanceof MainMenuFragment && !((MainMenuFragment) current).isRightPaneActive();
+        mWallpaper.setFocused(atHome);
+        // The space only moves where it can be seen
+        if(mSpace != null) mSpace.setActive(atHome);
     }
 
     private final FragmentManager.OnBackStackChangedListener mWallpaperFocusListener = this::refreshWallpaperFocus;
@@ -286,16 +293,6 @@ public class LauncherActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         boolean launchFromShortcut = savedInstanceState == null && selectShortcutInstance(getIntent());
         setContentView(R.layout.activity_mojo_ui);
-        View launcherRoot = findViewById(android.R.id.content);
-        if (launcherRoot != null) {
-            launcherRoot.setAlpha(0f);
-            launcherRoot.setScaleX(0.965f);
-            launcherRoot.setScaleY(0.965f);
-            launcherRoot.setTranslationY(18f * getResources().getDisplayMetrics().density);
-            launcherRoot.animate().alpha(1f).scaleX(1f).scaleY(1f).translationY(0f)
-                    .setDuration(520L).setInterpolator(new android.view.animation.DecelerateInterpolator())
-                    .start();
-        }
         MoJsonDownloader.prepareSubstitutionMap(getAssets());
 
         try {
@@ -313,6 +310,11 @@ public class LauncherActivity extends BaseActivity {
         // wallpaper, and the old ones show through and smear. A solid color costs next to nothing.
         getWindow().setBackgroundDrawable(new ColorDrawable(ThemeColors.surface(this)));
         bindViews();
+        // The opening animation plays when the app starts, not again after a rotation or a theme change
+        if(savedInstanceState == null) {
+            IntroAnimator.play(findViewById(R.id.intro_overlay), findViewById(R.id.intro_space),
+                    findViewById(R.id.intro_logo), findViewById(R.id.intro_title));
+        }
         PreferenceManager.getDefaultSharedPreferences(this).registerOnSharedPreferenceChangeListener(mBackgroundPrefListener);
         mRequestPermissionLauncher = this.registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
@@ -536,5 +538,9 @@ public class LauncherActivity extends BaseActivity {
         mSettingsButton = findViewById(R.id.setting_button);
         mProgressLayout = findViewById(R.id.progress_layout);
         mWallpaper = findViewById(R.id.launcher_wallpaper);
+        mSpace = findViewById(R.id.space_background);
+        // The account bar lets the space show through
+        View accountBar = findViewById(R.id.account_spinner);
+        accountBar.setBackgroundColor(ColorUtils.setAlphaComponent(ThemeColors.surfaceContainer(this), 0xCC));
     }
 }

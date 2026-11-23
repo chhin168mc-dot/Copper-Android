@@ -32,9 +32,8 @@ public final class ThemeManager {
     public static final String PREF_THEME_MODE = "theme_mode";
     public static final String PREF_COLOR_SOURCE = "color_source";
     public static final String PREF_CUSTOM_COLOR = "theme_custom_color";
-    public static final String PREF_FORCE_LANDSCAPE = "force_landscape";
-    /** The launcher opens in landscape until the user turns this off */
-    public static final boolean DEFAULT_FORCE_LANDSCAPE = true;
+    /** The space look is dark, the user can still pick another mode */
+    public static final String DEFAULT_THEME_MODE = "dark";
 
     public static final String SOURCE_DYNAMIC = "dynamic";
     public static final String SOURCE_DEFAULT = "default";
@@ -49,7 +48,7 @@ public final class ThemeManager {
     /** Call once from Application#onCreate */
     public static void init(Application application) {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(application);
-        applyThemeMode(preferences.getString(PREF_THEME_MODE, "system"));
+        applyThemeMode(preferences.getString(PREF_THEME_MODE, DEFAULT_THEME_MODE));
         application.registerActivityLifecycleCallbacks(new ColorCallbacks());
     }
 
@@ -82,11 +81,9 @@ public final class ThemeManager {
         }
     }
 
-    /** Locks the activity to landscape when the user asked for it, otherwise leaves it alone */
+    /** The launcher is landscape only */
     public static void applyForcedOrientation(@NonNull Activity activity) {
-        boolean force = PreferenceManager.getDefaultSharedPreferences(activity)
-                .getBoolean(PREF_FORCE_LANDSCAPE, DEFAULT_FORCE_LANDSCAPE);
-        if (force) activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
     }
 
     private static int getOverlayForColor(Activity activity, int color) {

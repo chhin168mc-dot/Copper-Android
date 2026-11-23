@@ -1,7 +1,9 @@
 package git.artdeell.mojo.fragments;
 
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -10,19 +12,26 @@ import androidx.fragment.app.Fragment;
 import com.kdt.mcgui.LauncherWallpaperView;
 
 import git.artdeell.mojo.R;
-import git.artdeell.mojo.home.HomeTileBoard;
+import git.artdeell.mojo.prefs.LauncherPreferences;
+import git.artdeell.mojo.skins.DefaultSkins;
+import git.artdeell.mojo.skins.PlayerPreviewView;
+import git.artdeell.mojo.skins.PlayerSkinLoader;
 
 /**
- * Home screen of the right pane of the two-pane landscape main menu: a board of tiles that can be
- * moved, resized, added and removed. The tiles themselves are run by {@link HomeTilesController},
- * which also runs the sidebar on the left, so a tile can be dragged from one side to the other.
- * The wallpaper is drawn behind the whole launcher by the activity, or by the view of this
- * screen when it isn't fullscreen.
+ * Home screen of the main menu: the player of the selected account in the middle of the space.
+ * Steve shows until the skin of a Microsoft or Ely.by account has loaded, and for accounts without a skin.
  */
 public class RightPaneHomeFragment extends Fragment {
     public static final String TAG = "RightPaneHomeFragment";
 
-    private HomeTileBoard mBoard;
+    private PlayerPreviewView mPlayer;
+    private TextView mName;
+    private String mShownKey;
+    private int mRequestId;
+
+    /* Reloads the skin when another account is selected, the preference holds the selected account file */
+    private final SharedPreferences.OnSharedPreferenceChangeListener mPreferenceListener =
+            (preferences, key) -> reloadSkin();
 
     public RightPaneHomeFragment() {
         super(R.layout.fragment_right_pane_home);
@@ -30,22 +39,45 @@ public class RightPaneHomeFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        // The wallpaper behind the tiles, only shown when it isn't fullscreen
+        // The wallpaper behind the player, only shown when it isn't fullscreen
         ((LauncherWallpaperView) view.findViewById(R.id.pane_wallpaper)).setPane(true);
-        mBoard = view.findViewById(R.id.home_tile_board);
-        if (getParentFragment() instanceof MainMenuFragment) {
-            HomeTilesController tiles = ((MainMenuFragment) getParentFragment()).getHomeTiles();
-            if (tiles != null) tiles.attachRight(mBoard);
-        }
+        mPlayer = view.findViewById(R.id.home_player);
+        mName = view.findViewById(R.id.home_player_name);
+        mName.setText("Steve");
+        mPlayer.setSkin(DefaultSkins.steve(), false);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        LauncherPreferences.DEFAULT_PREF.registerOnSharedPreferenceChangeListener(mPreferenceListener);
+        reloadSkin();
+    }
+
+    @Override
+    public void onPause() {
+        LauncherPreferences.DEFAULT_PREF.unregisterOnSharedPreferenceChangeListener(mPreferenceListener);
+        super.onPause();
+    }
+
+    private void reloadSkin() {
+        final int request = ++mRequestId;
+        PlayerSkinLoader.load(result -> {
+            // A newer request is on its way, or the screen is gone
+            if (request != mRequestId || mPlayer == null || !isAdded()) return;
+            mName.setText(result.name);
+            if (result.key.equals(mShownKey)) return;
+            mShownKey = result.key;
+            mPlayer.setSkin(result.skin, result.slim);
+        });
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (mBoard != null && getParentFragment() instanceof MainMenuFragment) {
-            HomeTilesController tiles = ((MainMenuFragment) getParentFragment()).getHomeTiles();
-            if (tiles != null) tiles.detachRight(mBoard);
-        }
-        mBoard = null;
+        mRequestId++;
+        mPlayer = null;
+        mName = null;
+        mShownKey = null;
     }
 }

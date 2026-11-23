@@ -11,7 +11,9 @@ import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.animation.DecelerateInterpolator;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
@@ -25,6 +27,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.constraintlayout.widget.Guideline;
 import androidx.core.graphics.ColorUtils;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
@@ -36,13 +39,6 @@ import com.kdt.mcgui.mcVersionSpinner;
 
 import git.artdeell.mojo.CustomControlsActivity;
 import git.artdeell.mojo.R;
-import git.artdeell.mojo.authenticator.accounts.Account;
-import git.artdeell.mojo.authenticator.accounts.Accounts;
-import android.graphics.BitmapFactory;
-import android.graphics.Bitmap;
-import java.net.URL;
-import git.artdeell.mojo.skins.DefaultSteveSkin;
-import git.artdeell.mojo.skins.PlayerPreviewView;
 
 import git.artdeell.mojo.LauncherActivity;
 import git.artdeell.mojo.Tools;
@@ -62,9 +58,9 @@ import java.util.List;
 import java.io.File;
 
 /**
- * The main menu. In portrait it is a single column and every screen replaces it.
- * In landscape it is a two-pane layout: the actions stay in the left sidebar and every screen
- * opened with {@link Tools#swapFragment} shows up in the right pane, which has its own back stack.
+ * The main menu, landscape only. The home screen shows the player of the selected account in the
+ * middle of the space, the Quick Actions and Instance Tools are in a menu that slides in from the left.
+ * Every screen opened with {@link Tools#swapFragment} shows up in the pane above the home screen, which has its own back stack.
  */
 public class MainMenuFragment extends Fragment {
     public static final String TAG = "MainMenuFragment";
@@ -83,6 +79,14 @@ public class MainMenuFragment extends Fragment {
     private View mAddRightButton;
     private View[] mVersionBarViews = new View[0];
     private boolean mEditing;
+    /* The menu that slides in from the left, and what opens it */
+    private Guideline mPaneGuideline;
+    private View mMenuPanel;
+    private View mMenuScrim;
+    private View mMenuButton;
+    private View mMenuEdge;
+    private boolean mMenuOpen;
+    private OnBackPressedCallback mMenuBackCallback;
     private OnBackPressedCallback mEditBackCallback;
     /* A custom background is set: it shows through the main menu, which then is partly see-through */
     private boolean mHasWallpaper;
@@ -166,6 +170,48 @@ public class MainMenuFragment extends Fragment {
         boolean atHome = getChildFragmentManager().getBackStackEntryCount() == 0;
         // While the tiles are edited the bar holds the edit buttons, wherever the right pane is
         mBottomBar.setVisibility(atHome || mEditing ? View.VISIBLE : View.GONE);
+        // The menu belongs to the home screen as well
+        if (mMenuButton != null) mMenuButton.setVisibility(atHome ? View.VISIBLE : View.GONE);
+        if (mMenuEdge != null) mMenuEdge.setVisibility(atHome ? View.VISIBLE : View.GONE);
+        if (!atHome) closeQuickMenu();
+    }
+
+    /** Slides the Quick Actions / Instance Tools menu in from the left */
+    public void openQuickMenu() {
+        if (mMenuPanel == null || mMenuScrim == null || mMenuOpen) return;
+        mMenuOpen = true;
+        mMenuBackCallback.setEnabled(true);
+        mMenuScrim.animate().cancel();
+        mMenuScrim.setVisibility(View.VISIBLE);
+        mMenuScrim.setAlpha(0f);
+        mMenuScrim.animate().alpha(1f).setDuration(200L).start();
+        mMenuPanel.animate().cancel();
+        mMenuPanel.setVisibility(View.VISIBLE);
+        mMenuPanel.setTranslationX(menuHiddenX());
+        mMenuPanel.animate().translationX(0f).setDuration(260L)
+                .setInterpolator(new DecelerateInterpolator()).start();
+    }
+
+    public void closeQuickMenu() {
+        if (mMenuPanel == null || mMenuScrim == null || !mMenuOpen) return;
+        mMenuOpen = false;
+        mMenuBackCallback.setEnabled(false);
+        final View panel = mMenuPanel;
+        final View scrim = mMenuScrim;
+        scrim.animate().cancel();
+        scrim.animate().alpha(0f).setDuration(180L).withEndAction(() -> {
+            if (!mMenuOpen) scrim.setVisibility(View.GONE);
+        }).start();
+        panel.animate().cancel();
+        panel.animate().translationX(menuHiddenX()).setDuration(220L).withEndAction(() -> {
+            if (!mMenuOpen) panel.setVisibility(View.INVISIBLE);
+        }).start();
+    }
+
+    private float menuHiddenX() {
+        int width = mMenuPanel.getWidth();
+        if (width == 0) width = Math.round(300f * getResources().getDisplayMetrics().density);
+        return -width;
     }
 
     /** The edit buttons take the place of the version bar and the play button while the tiles are edited */
@@ -200,13 +246,14 @@ public class MainMenuFragment extends Fragment {
         boolean atHome = getChildFragmentManager().getBackStackEntryCount() == 0;
         boolean wallpaperHere = mHasWallpaper && (atHome || mShowOthers);
         View root = getView();
-        if (root != null && mHasWallpaper) {
-            root.setBackgroundColor(wallpaperHere ? Color.TRANSPARENT : ThemeColors.surfaceContainer(requireContext()));
+        // The space shows through the home screen, the other screens cover it
+        if (root != null) {
+            root.setBackgroundColor(atHome || wallpaperHere ? Color.TRANSPARENT : ThemeColors.surfaceContainer(requireContext()));
         }
-        if (!mHasWallpaper || !wallpaperHere && !atHome) {
-            mRightPane.setBackgroundResource(R.drawable.bg_right_pane);
-        } else if (atHome) {
+        if (atHome) {
             mRightPane.setBackground(null);
+        } else if (!mHasWallpaper || !wallpaperHere) {
+            mRightPane.setBackgroundResource(R.drawable.bg_right_pane);
         } else {
             int overlay = LauncherBackground.getOverlay(requireContext());
             if (overlay == 0) {
@@ -226,15 +273,7 @@ public class MainMenuFragment extends Fragment {
         mHasWallpaper = LauncherBackground.isFullscreenActive(requireContext());
         mShowOthers = LauncherBackground.showOnOtherScreens(requireContext());
         if (!mHasWallpaper) return;
-        int panel = ColorUtils.setAlphaComponent(ThemeColors.surfaceContainer(requireContext()), 0xB8);
         root.setBackgroundColor(Color.TRANSPARENT);
-        if (mLeftSidebar != null) mLeftSidebar.setBackgroundColor(panel);
-        if (mBottomBar != null) {
-            GradientDrawable bar = new GradientDrawable();
-            bar.setColor(panel);
-            bar.setCornerRadius(24f * getResources().getDisplayMetrics().density);
-            mBottomBar.setBackground(bar);
-        }
     }
 
     // ─── Browse / Manage Content ─────────────────────────────────────────────
@@ -364,8 +403,10 @@ public class MainMenuFragment extends Fragment {
         Fragment leftFragment = getChildFragmentManager().findFragmentById(R.id.left_pane_container);
         boolean paneActive = leftFragment instanceof ContentPickerFragment
                 || leftFragment instanceof ContentDetailFragment;
-        mLeftSidebar.setVisibility(paneActive ? View.GONE : View.VISIBLE);
+        // The sidebar view is a stand-in, the picker takes a third of the screen and the pane gets the rest
+        mLeftSidebar.setVisibility(View.GONE);
         mLeftPaneContainer.setVisibility(paneActive ? View.VISIBLE : View.GONE);
+        if (mPaneGuideline != null) mPaneGuideline.setGuidelinePercent(paneActive ? 0.33f : 0f);
     }
 
     private void showContentPickerDialog(boolean manage) {
@@ -512,14 +553,21 @@ public class MainMenuFragment extends Fragment {
             }
         };
         requireActivity().getOnBackPressedDispatcher().addCallback(this, mEditBackCallback);
+        // Closes the menu first when it is open
+        mMenuBackCallback = new OnBackPressedCallback(false) {
+            @Override
+            public void handleOnBackPressed() {
+                closeQuickMenu();
+            }
+        };
+        requireActivity().getOnBackPressedDispatcher().addCallback(this, mMenuBackCallback);
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        // Portrait only
+        // Quick Actions
         Button mNewsButton = view.findViewById(R.id.news_button);
         Button mDiscordButton = view.findViewById(R.id.social_media_button);
-        // Both
         Button mCustomControlButton = view.findViewById(R.id.custom_control_button);
         Button mInstallJarButton = view.findViewById(R.id.install_jar_button);
         Button mShareLogsButton = view.findViewById(R.id.share_logs_button);
@@ -530,40 +578,6 @@ public class MainMenuFragment extends Fragment {
         ImageButton mEditProfileButton = view.findViewById(R.id.edit_profile_button);
         Button mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
-        PlayerPreviewView playerPreview = view.findViewById(R.id.home_player_preview);
-        if (playerPreview != null) {
-            // Steve is the immediate fallback; Microsoft and Ely.by skins replace it
-            // asynchronously when the selected account exposes a skin endpoint.
-            playerPreview.setSkin(DefaultSteveSkin.create(), false);
-            Account activeAccount = Accounts.getCurrent();
-            if (activeAccount != null && activeAccount.authType != null
-                    && activeAccount.authType.skinUrl != null
-                    && activeAccount.username != null) {
-                final String skinUrl = String.format(activeAccount.authType.skinUrl, activeAccount.username);
-                final boolean slimModel = false;
-                final android.app.Activity hostActivity = requireActivity();
-                new Thread(() -> {
-                    Bitmap skinBitmap = null;
-                    try (java.io.InputStream input = new URL(skinUrl).openStream()) {
-                        skinBitmap = BitmapFactory.decodeStream(input);
-                    } catch (Exception ignored) { }
-                    if (skinBitmap != null && isAdded()) {
-                        final Bitmap loadedSkin = skinBitmap;
-                        hostActivity.runOnUiThread(() -> {
-                            if (isAdded() && playerPreview.getWindowToken() != null)
-                                playerPreview.setSkin(loadedSkin, slimModel);
-                            else loadedSkin.recycle();
-                        });
-                    }
-                }, "Nokor-Skin-Preview").start();
-            }
-            playerPreview.setAlpha(0f);
-            playerPreview.setScaleX(0.88f);
-            playerPreview.setScaleY(0.88f);
-            playerPreview.animate().alpha(1f).scaleX(1f).scaleY(1f)
-                    .setDuration(650L).setStartDelay(140L)
-                    .setInterpolator(new android.view.animation.OvershootInterpolator(0.8f)).start();
-        }
 
         mRightPane = view.findViewById(R.id.right_pane_container);
         mBottomBar = view.findViewById(R.id.bottom_bar);
@@ -571,11 +585,17 @@ public class MainMenuFragment extends Fragment {
         mLeftPaneContainer = view.findViewById(R.id.left_pane_container);
         mEditControls = view.findViewById(R.id.home_edit_controls);
         mAddRightButton = view.findViewById(R.id.home_edit_add_right);
+        mPaneGuideline = view.findViewById(R.id.pane_guideline);
+        mMenuPanel = view.findViewById(R.id.quick_menu_panel);
+        mMenuScrim = view.findViewById(R.id.quick_menu_scrim);
+        mMenuButton = view.findViewById(R.id.quick_menu_button);
+        mMenuEdge = view.findViewById(R.id.quick_menu_edge);
+        mMenuOpen = false;
         mVersionBarViews = new View[]{mVersionSpinner, mEditProfileButton, mPlayButton};
         getChildFragmentManager().addOnBackStackChangedListener(mBackStackListener);
         if (isTwoPane()) {
             applyWallpaperBackdrop(view);
-            setupHomeTiles(view);
+            setupQuickMenu();
         }
 
         FragmentManager childManager = getChildFragmentManager();
@@ -595,46 +615,59 @@ public class MainMenuFragment extends Fragment {
             childManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
         }
 
-        ViewGroup staggerParent = !isTwoPane() && mNewsButton != null ? (ViewGroup) mNewsButton.getParent() : null;
-        AnimationManager.staggerIn(staggerParent);
-
+        // Wiki and Telegram are Quick Actions, the long press on Wiki keeps opening the gamepad mapper
+        bindMenuAction(mNewsButton, () -> Tools.openURL(requireActivity(), Tools.URL_HOME));
         if (mNewsButton != null) {
-            mNewsButton.setOnClickListener(v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
             mNewsButton.setOnLongClickListener((v)->{
+                closeQuickMenu();
                 Tools.swapFragment(requireActivity(), GamepadMapperFragment.class, GamepadMapperFragment.TAG, null);
                 return true;
             });
         }
-        if (mDiscordButton != null)
-            mDiscordButton.setOnClickListener(v -> Tools.openURL(requireActivity(), getString(R.string.social_media_invite)));
+        bindMenuAction(mDiscordButton, () -> Tools.openURL(requireActivity(), getString(R.string.social_media_invite)));
+        bindMenuAction(mModStoreButton, () -> showContentPicker(false));
+        bindMenuAction(mCustomControlButton, () -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
 
-        // In landscape these are tiles of the sidebar, see HomeTilesController
-        if (mCustomControlButton != null)
-            mCustomControlButton.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
-        if (mInstallJarButton != null)
-            mInstallJarButton.setOnClickListener(v -> runInstallerWithConfirmation());
+        // Instance Tools
+        bindMenuAction(mManageContentButton, () -> showContentPicker(true));
+        bindMenuAction(mOpenDirectoryButton, () -> openGameDirectory(requireContext()));
+        bindMenuAction(mInstallJarButton, this::runInstallerWithConfirmation);
+        bindMenuAction(mShareLogsButton, () -> shareLog(requireContext()));
+
         mEditProfileButton.setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
-
         mPlayButton.setOnClickListener(v -> ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true));
-
-        if (mShareLogsButton != null) mShareLogsButton.setOnClickListener((v) -> shareLog(requireContext()));
-
-        if (mModStoreButton != null) mModStoreButton.setOnClickListener(v -> showContentPicker(false));
-        if (mManageContentButton != null) mManageContentButton.setOnClickListener(v -> showContentPicker(true));
-        if (mOpenDirectoryButton != null) mOpenDirectoryButton.setOnClickListener((v)-> openGameDirectory(v.getContext()));
     }
 
-    /** Landscape: the tiles of the sidebar and the buttons that edit them */
-    private void setupHomeTiles(@NonNull View view) {
-        mHomeTiles = new HomeTilesController(this);
-        view.findViewById(R.id.home_edit_add_left).setOnClickListener(
-                v -> mHomeTiles.onAddClicked(HomeTilesController.Side.LEFT));
-        view.findViewById(R.id.home_edit_add_right).setOnClickListener(
-                v -> mHomeTiles.onAddClicked(HomeTilesController.Side.RIGHT));
-        view.findViewById(R.id.home_edit_more).setOnClickListener(v -> mHomeTiles.showMoreMenu(v));
-        view.findViewById(R.id.home_edit_done).setOnClickListener(v -> mHomeTiles.exitEditMode());
-        HomeTileBoard sidebar = view.findViewById(R.id.sidebar_tile_board);
-        if (sidebar != null) mHomeTiles.attachLeft(sidebar);
+    /** A button of the menu: the menu closes, then the action runs */
+    private void bindMenuAction(@Nullable View button, @NonNull Runnable action) {
+        if (button == null) return;
+        button.setOnClickListener(v -> {
+            closeQuickMenu();
+            action.run();
+        });
+    }
+
+    /** The button, the swipe from the left edge and the dimmed area that open and close the menu */
+    private void setupQuickMenu() {
+        if (mMenuButton != null) mMenuButton.setOnClickListener(v -> openQuickMenu());
+        if (mMenuScrim != null) mMenuScrim.setOnClickListener(v -> closeQuickMenu());
+        if (mMenuEdge != null) {
+            final float threshold = 32f * getResources().getDisplayMetrics().density;
+            final float[] downX = new float[1];
+            mMenuEdge.setOnTouchListener((v, event) -> {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downX[0] = event.getRawX();
+                        break;
+                    case MotionEvent.ACTION_MOVE:
+                        if (event.getRawX() - downX[0] > threshold) openQuickMenu();
+                        break;
+                    default:
+                        break;
+                }
+                return true;
+            });
+        }
     }
 
     @Override
@@ -652,6 +685,13 @@ public class MainMenuFragment extends Fragment {
         mVersionBarViews = new View[0];
         mEditing = false;
         mVersionSpinner = null;
+        mPaneGuideline = null;
+        mMenuPanel = null;
+        mMenuScrim = null;
+        mMenuButton = null;
+        mMenuEdge = null;
+        mMenuOpen = false;
+        if (mMenuBackCallback != null) mMenuBackCallback.setEnabled(false);
     }
 
     public void openGameDirectory(Context context) {

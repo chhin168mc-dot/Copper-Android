@@ -105,18 +105,10 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
     public void onSharedPreferenceChanged(SharedPreferences p, String s) {
         LauncherPreferences.loadPreferences(getContext());
         if(ThemeManager.PREF_THEME_MODE.equals(s)) {
-            ThemeManager.applyThemeMode(p.getString(s, "system"));
+            ThemeManager.applyThemeMode(p.getString(s, ThemeManager.DEFAULT_THEME_MODE));
         }else if(ThemeManager.PREF_COLOR_SOURCE.equals(s) || ThemeManager.PREF_CUSTOM_COLOR.equals(s)
                 || AnimationManager.PREF_TYPES.equals(s)) {
             scheduleRecreate();
-        }else if(ThemeManager.PREF_FORCE_LANDSCAPE.equals(s)) {
-            Activity activity = getActivity();
-            if(activity == null) return;
-            if(p.getBoolean(s, ThemeManager.DEFAULT_FORCE_LANDSCAPE)) {
-                activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-            }else if(activity instanceof LauncherActivity) {
-                activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
-            }
         }
     }
 
