@@ -311,9 +311,13 @@ public class LauncherActivity extends BaseActivity {
         getWindow().setBackgroundDrawable(new ColorDrawable(ThemeColors.surface(this)));
         bindViews();
         // The opening animation plays when the app starts, not again after a rotation or a theme change
-        if(savedInstanceState == null) {
-            IntroAnimator.play(findViewById(R.id.intro_overlay), findViewById(R.id.intro_space),
-                    findViewById(R.id.intro_logo), findViewById(R.id.intro_title));
+        View introSpace = findViewById(R.id.intro_space);
+        View introOverlay = findViewById(R.id.intro_overlay);
+        View introLogo = findViewById(R.id.intro_logo);
+        View introTitle = findViewById(R.id.intro_title);
+        if(savedInstanceState == null && introSpace instanceof SpaceBackgroundView
+                && introOverlay != null && introLogo != null && introTitle != null) {
+            IntroAnimator.play(introOverlay, (SpaceBackgroundView) introSpace, introLogo, introTitle);
         }
         PreferenceManager.getDefaultSharedPreferences(this).registerOnSharedPreferenceChangeListener(mBackgroundPrefListener);
         mRequestPermissionLauncher = this.registerForActivityResult(
@@ -538,7 +542,8 @@ public class LauncherActivity extends BaseActivity {
         mSettingsButton = findViewById(R.id.setting_button);
         mProgressLayout = findViewById(R.id.progress_layout);
         mWallpaper = findViewById(R.id.launcher_wallpaper);
-        mSpace = findViewById(R.id.space_background);
+        View space = findViewById(R.id.space_background);
+        mSpace = space instanceof SpaceBackgroundView ? (SpaceBackgroundView) space : null;
         // The account bar lets the space show through
         View accountBar = findViewById(R.id.account_spinner);
         accountBar.setBackgroundColor(ColorUtils.setAlphaComponent(ThemeColors.surfaceContainer(this), 0xCC));
