@@ -1,10 +1,15 @@
 package git.artdeell.mojo.skins;
 
+import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import git.artdeell.mojo.R;
 
 /** Skins that are drawn in code, used when an account has no skin of its own */
 public final class DefaultSkins {
@@ -18,11 +23,28 @@ public final class DefaultSkins {
     private static final int EYE_BLUE = 0xFF3A3A9A;
     private static final int MOUTH = 0xFF7A4636;
 
+    @Nullable
+    private static Bitmap sBundled;
+
     private DefaultSkins() {}
 
-    /** @return a new 64x64 skin in the style of the default Steve */
+    /** Loads the skin that comes with the app (res/drawable-nodpi/default_skin.png), call it once before {@link #steve()} */
+    public static synchronized void init(@NonNull Context context) {
+        if (sBundled != null) return;
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inScaled = false;
+        sBundled = BitmapFactory.decodeResource(context.getResources(), R.drawable.default_skin, options);
+    }
+
+    /** @return a new 64x64 default skin: the bundled one, or Steve drawn in code when the bundled one is not loaded */
     @NonNull
-    public static Bitmap steve() {
+    public static synchronized Bitmap steve() {
+        if (sBundled != null) return sBundled.copy(Bitmap.Config.ARGB_8888, true);
+        return drawSteve();
+    }
+
+    @NonNull
+    private static Bitmap drawSteve() {
         Bitmap bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint();

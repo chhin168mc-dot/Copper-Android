@@ -10,6 +10,7 @@ import android.graphics.RectF;
 import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -64,6 +65,7 @@ public class PlayerPreviewView extends View {
     private float mYaw = 25f;
     private float mPitch = 12f;
     private float mLastTouchX, mLastTouchY;
+    private float mDownX, mDownY;
     private boolean mDragging;
     private long mLastFrameTime;
 
@@ -326,6 +328,8 @@ public class PlayerPreviewView extends View {
                 mDragging = true;
                 mLastTouchX = event.getX();
                 mLastTouchY = event.getY();
+                mDownX = mLastTouchX;
+                mDownY = mLastTouchY;
                 return true;
             case MotionEvent.ACTION_MOVE:
                 mYaw += (event.getX() - mLastTouchX) * 0.6f;
@@ -336,6 +340,11 @@ public class PlayerPreviewView extends View {
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
+                // A touch that stayed in place is a tap, a drag only turns the player
+                if (event.getActionMasked() == MotionEvent.ACTION_UP && hasOnClickListeners()) {
+                    float slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+                    if (Math.abs(event.getX() - mDownX) < slop && Math.abs(event.getY() - mDownY) < slop) performClick();
+                }
                 mDragging = false;
                 mLastFrameTime = SystemClock.uptimeMillis();
                 invalidate();

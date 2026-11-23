@@ -73,10 +73,12 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="@drawable/bg_popup_rounded"
-            android:drawableEnd="@drawable/spinner_arrow"
-            app:drawableEndPadding="@dimen/_1sdp"
-            app:drawableEndSize="@dimen/_12sdp"
+            android:background="@drawable/bg_instance_picker"
+            android:drawableEnd="@drawable/spinner_arrow_bright"
+            android:textColor="#FFFFFFFF"
+            android:textStyle="bold"
+            app:drawableEndPadding="@dimen/_4sdp"
+            app:drawableEndSize="@dimen/_16sdp"
             app:drawableStartIntegerScaling="true"
             app:drawableStartSize="@dimen/_32sdp" />
 
@@ -85,7 +87,7 @@
             android:layout_width="@dimen/_44sdp"
             android:layout_height="match_parent"
             android:layout_marginStart="@dimen/_4sdp"
-            android:background="@drawable/bg_popup_rounded"
+            android:background="@drawable/bg_instance_picker"
             android:src="@drawable/ic_px_edit" />
 
         <com.kdt.mcgui.MineButton
@@ -98,18 +100,7 @@
             android:textAllCaps="true" />
     </LinearLayout>
 
-    <!-- Opens the menu, so does a swipe from the left edge -->
-    <ImageButton
-        android:id="@+id/quick_menu_button"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_marginStart="14dp"
-        android:background="@drawable/bg_space_fab"
-        android:contentDescription="@string/quick_menu_title"
-        android:src="@drawable/ic_space_menu"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+    <!-- The menu button is in the top bar of the activity, next to the settings button. A swipe from the left edge opens the menu too -->
 
     <View
         android:id="@+id/quick_menu_edge"

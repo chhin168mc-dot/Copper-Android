@@ -586,7 +586,8 @@ public class MainMenuFragment extends Fragment {
         mPaneGuideline = view.findViewById(R.id.pane_guideline);
         mMenuPanel = view.findViewById(R.id.quick_menu_panel);
         mMenuScrim = view.findViewById(R.id.quick_menu_scrim);
-        mMenuButton = view.findViewById(R.id.quick_menu_button);
+        // The button sits in the top bar of the activity, next to the settings button
+        mMenuButton = requireActivity().findViewById(R.id.quick_menu_button);
         mMenuEdge = view.findViewById(R.id.quick_menu_edge);
         mMenuOpen = false;
         mVersionBarViews = new View[]{mVersionSpinner, mEditProfileButton, mPlayButton};
@@ -686,6 +687,10 @@ public class MainMenuFragment extends Fragment {
         mPaneGuideline = null;
         mMenuPanel = null;
         mMenuScrim = null;
+        if (mMenuButton != null) {
+            mMenuButton.setOnClickListener(null);
+            mMenuButton.setVisibility(View.GONE);
+        }
         mMenuButton = null;
         mMenuEdge = null;
         mMenuOpen = false;

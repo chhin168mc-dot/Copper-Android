@@ -4,18 +4,26 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.kdt.mcgui.LauncherWallpaperView;
+import com.kdt.mcgui.ProgressLayout;
 
 import git.artdeell.mojo.R;
+import git.artdeell.mojo.Tools;
+import git.artdeell.mojo.authenticator.AuthType;
+import git.artdeell.mojo.authenticator.accounts.Account;
+import git.artdeell.mojo.authenticator.accounts.Accounts;
+import git.artdeell.mojo.progresskeeper.ProgressKeeper;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.skins.DefaultSkins;
 import git.artdeell.mojo.skins.PlayerPreviewView;
 import git.artdeell.mojo.skins.PlayerSkinLoader;
+import git.artdeell.mojo.skins.SkinEditorFragment;
 
 /**
  * Home screen of the main menu: the player of the selected account in the middle of the space.
@@ -44,7 +52,10 @@ public class RightPaneHomeFragment extends Fragment {
         mPlayer = view.findViewById(R.id.home_player);
         mName = view.findViewById(R.id.home_player_name);
         mName.setText("Steve");
+        DefaultSkins.init(requireContext());
         mPlayer.setSkin(DefaultSkins.steve(), false);
+        // A tap on the player opens the skin editor on the capes tab
+        mPlayer.setOnClickListener(v -> openCapePicker());
     }
 
     @Override
@@ -58,6 +69,27 @@ public class RightPaneHomeFragment extends Fragment {
     public void onPause() {
         LauncherPreferences.DEFAULT_PREF.unregisterOnSharedPreferenceChangeListener(mPreferenceListener);
         super.onPause();
+    }
+
+    /** Opens the skin editor of the selected account on the capes tab */
+    private void openCapePicker() {
+        Account account = Accounts.getCurrent();
+        if (account == null || account.getSaveLocation() == null) {
+            Toast.makeText(requireContext(), R.string.skin_editor_no_account, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (account.authType == AuthType.ELY_BY) {
+            Tools.openURL(requireActivity(), "https://ely.by/skins");
+            return;
+        }
+        if (ProgressKeeper.hasProgressKey(ProgressLayout.AUTHENTICATE)) {
+            Toast.makeText(requireContext(), R.string.tasks_ongoing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Bundle args = new Bundle();
+        args.putString(SkinEditorFragment.ARG_ACCOUNT_FILE, account.getSaveLocation().getName());
+        args.putBoolean(SkinEditorFragment.ARG_OPEN_CAPES, true);
+        Tools.swapFragmentFullScreen(requireActivity(), SkinEditorFragment.class, SkinEditorFragment.TAG, args);
     }
 
     private void reloadSkin() {

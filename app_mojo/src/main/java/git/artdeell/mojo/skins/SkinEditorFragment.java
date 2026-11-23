@@ -70,6 +70,8 @@ public class SkinEditorFragment extends Fragment {
     public static final String TAG = "SKIN_EDITOR_FRAGMENT";
     /** File name (inside the accounts folder) of the account to edit */
     public static final String ARG_ACCOUNT_FILE = "account_file";
+    /** Optional boolean: open on the capes tab instead of the skins tab */
+    public static final String ARG_OPEN_CAPES = "open_capes";
 
     private static final int TAB_SKINS = 0;
     private static final int TAB_CAPES = 1;
@@ -144,7 +146,8 @@ public class SkinEditorFragment extends Fragment {
             if (!isChecked) return;
             setTab(checkedId == R.id.skin_tab_capes ? TAB_CAPES : TAB_SKINS);
         });
-        tabs.check(R.id.skin_tab_skins);
+        boolean openCapes = savedInstanceState == null && requireArguments().getBoolean(ARG_OPEN_CAPES, false);
+        tabs.check(openCapes ? R.id.skin_tab_capes : R.id.skin_tab_skins);
 
         mSlimSwitch.setEnabled(false);
         mSlimSwitch.setOnCheckedChangeListener((button, checked) -> {

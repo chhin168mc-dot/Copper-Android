@@ -27,12 +27,26 @@
 
     <com.kdt.mcgui.AccountSpinner
         android:id="@+id/account_spinner"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="@dimen/_42sdp"
         android:popupBackground="@drawable/bg_popup_rounded"
         android:dropDownWidth="wrap_content"
         android:dropDownVerticalOffset="@dimen/_42sdp"
+        app:layout_constraintEnd_toStartOf="@+id/quick_menu_button"
         app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Opens the Quick Actions menu, next to the settings button. It only shows on the home screen -->
+    <ImageButton
+        android:id="@+id/quick_menu_button"
+        android:layout_width="@dimen/_52sdp"
+        android:layout_height="@dimen/_42sdp"
+        android:background="?attr/selectableItemBackground"
+        android:contentDescription="@string/quick_menu_title"
+        android:padding="@dimen/_10sdp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_space_menu"
+        app:layout_constraintEnd_toStartOf="@+id/setting_button"
         app:layout_constraintTop_toTopOf="parent" />
 
     <ImageButton
