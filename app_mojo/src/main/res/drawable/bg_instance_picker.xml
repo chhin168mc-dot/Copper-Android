@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Instance picker and its edit button on the home screen: an opaque panel with a clear border, so it stands out on the space -->
+<!-- Instance picker and its edit button on the home screen: the same brown as the "+ Add account" row and the instance list -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
-    android:color="#44FFFFFF">
+    android:color="#33FFFFFF">
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#F2141E45" />
+            <solid android:color="?attr/colorSurfaceContainerHigh" />
             <corners android:radius="16dp" />
-            <stroke android:width="2dp" android:color="#FFFFB4AB" />
         </shape>
     </item>
 </ripple>

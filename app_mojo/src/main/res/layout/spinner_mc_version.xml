@@ -8,6 +8,8 @@
     android:fadeScrollbars="false"
     android:scrollbarThumbVertical="?attr/colorPrimary"
     android:paddingVertical="@dimen/_4sdp"
+    android:clipToPadding="false"
+    android:clipToOutline="true"
     android:scrollbarSize="@dimen/padding_medium"
-    android:background="@drawable/bg_sheet_rounded_top"
+    android:background="@drawable/bg_instance_popup"
     android:divider="@null" />

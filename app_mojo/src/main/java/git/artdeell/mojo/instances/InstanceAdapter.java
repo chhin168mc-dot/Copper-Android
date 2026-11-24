@@ -93,19 +93,20 @@ public class InstanceAdapter extends BaseAdapter {
             extendedTextView.setText(versionName);
         else extendedTextView.setText(String.format("%s - %s", profileName, versionName));
 
-        // Set selected background if needed
-        if(idx == mSelectionIndex && displaySelection) {
+        // Only the rows of the list get a background, the spinner on the home screen keeps its own
+        if(!displaySelection) return;
+        if(idx == mSelectionIndex) {
             extendedTextView.setBackgroundColor(ThemeColors.get(extendedTextView, com.google.android.material.R.attr.colorSecondaryContainer));
         }else {
             extendedTextView.setBackgroundColor(Color.TRANSPARENT);
         }
     }
 
-    public void setViewExtra(View v, InstanceAdapterExtra extra) {
+    public void setViewExtra(View v, InstanceAdapterExtra extra, boolean displaySelection) {
         ExtendedTextView extendedTextView = (ExtendedTextView) v;
         extendedTextView.setCompoundDrawablesRelative(extra.icon, null, extendedTextView.getCompoundsDrawables()[2], null);
         extendedTextView.setText(extra.name);
-        extendedTextView.setBackgroundColor(Color.TRANSPARENT);
+        if(displaySelection) extendedTextView.setBackgroundColor(Color.TRANSPARENT);
     }
 
     public void setView(View v, int index, boolean displaySelection) {
@@ -113,7 +114,7 @@ public class InstanceAdapter extends BaseAdapter {
         if(object instanceof DisplayInstance) {
             setViewInstance(v, (DisplayInstance) object, index, displaySelection);
         }else if(object instanceof InstanceAdapterExtra) {
-            setViewExtra(v, (InstanceAdapterExtra) object);
+            setViewExtra(v, (InstanceAdapterExtra) object, displaySelection);
         }
     }
 

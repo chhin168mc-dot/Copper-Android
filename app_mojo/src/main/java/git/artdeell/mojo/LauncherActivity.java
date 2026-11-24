@@ -11,6 +11,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
+import android.graphics.drawable.RippleDrawable;
 import androidx.preference.PreferenceManager;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -547,5 +549,19 @@ public class LauncherActivity extends BaseActivity {
         // The account bar lets the space show through
         View accountBar = findViewById(R.id.account_spinner);
         accountBar.setBackgroundColor(ColorUtils.setAlphaComponent(ThemeColors.surfaceContainer(this), 0xCC));
+        // The menu and settings buttons are part of the same bar
+        applyBarAlpha(findViewById(R.id.quick_menu_button));
+        applyBarAlpha(mSettingsButton);
+    }
+
+    /** Gives the first layer of a bar button (see bg_topbar_button) the same transparency as the account bar */
+    private static void applyBarAlpha(@Nullable View button) {
+        if(button == null || button.getBackground() == null) return;
+        Drawable background = button.getBackground().mutate();
+        if(!(background instanceof RippleDrawable) || ((RippleDrawable) background).getNumberOfLayers() == 0) return;
+        Drawable content = ((RippleDrawable) background).getDrawable(0);
+        if(content instanceof LayerDrawable && ((LayerDrawable) content).getNumberOfLayers() > 0) {
+            ((LayerDrawable) content).getDrawable(0).setAlpha(0xCC);
+        }
     }
 }

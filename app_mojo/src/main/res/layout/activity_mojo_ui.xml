@@ -41,11 +41,12 @@
         android:id="@+id/quick_menu_button"
         android:layout_width="@dimen/_52sdp"
         android:layout_height="@dimen/_42sdp"
-        android:background="?attr/selectableItemBackground"
+        android:background="@drawable/bg_topbar_button"
         android:contentDescription="@string/quick_menu_title"
         android:padding="@dimen/_10sdp"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_space_menu"
+        android:tint="?attr/colorOnSurface"
         app:layout_constraintEnd_toStartOf="@+id/setting_button"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -53,7 +54,7 @@
         android:id="@+id/setting_button"
         android:layout_width="@dimen/_52sdp"
         android:layout_height="@dimen/_42sdp"
-        android:background="?attr/selectableItemBackground"
+        android:background="@drawable/bg_topbar_button"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_px_sliders"
         app:layout_constraintEnd_toEndOf="parent"

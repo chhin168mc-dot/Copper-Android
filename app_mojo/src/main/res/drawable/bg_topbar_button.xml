@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Menu and settings buttons: the color of the account bar, with the same line under it. The first layer gets the bar's transparency in LauncherActivity -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33FFFFFF">
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="?attr/colorSurfaceContainer" />
+                </shape>
+            </item>
+            <item android:gravity="bottom" android:height="@dimen/_2sdp">
+                <shape android:shape="rectangle">
+                    <solid android:color="?attr/colorPrimary" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</ripple>

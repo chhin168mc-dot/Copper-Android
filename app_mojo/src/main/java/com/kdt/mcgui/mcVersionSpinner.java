@@ -5,6 +5,7 @@ import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.res.Resources;
 import android.os.Build;
 import android.transition.Slide;
 import android.transition.Transition;
@@ -135,6 +136,11 @@ public class mcVersionSpinner extends ExtendedTextView {
                 }
                 // Match the spinner, it does not span the whole screen in the two-pane layout
                 mPopupWindow.setWidth(getWidth());
+                // As tall as the rows need, up to the old fixed height, so there is no empty space under the last row
+                Resources res = getResources();
+                int rows = res.getDimensionPixelOffset(R.dimen._48sdp) * mProfileAdapter.getCount();
+                int padding = res.getDimensionPixelOffset(R.dimen._4sdp) * 2;
+                mPopupWindow.setHeight(Math.min(rows + padding, res.getDimensionPixelOffset(R.dimen._184sdp)));
                 mPopupWindow.showAsDropDown(mcVersionSpinner.this, 0, offset);
                 // Post() is required for the layout inflation phase
                 post(() -> mListView.setSelection(mSelectedIndex));
