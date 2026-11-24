@@ -1,0 +1,180 @@
+name: Android CI
+
+on:
+  push:
+  workflow_dispatch:
+  branch_protection_rule:
+    types: [labeled]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    env:
+      UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_NEXT_KEYSTORE_PASSWORD }}
+      MOJOPUB_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_NEXT_KEYSTORE_PASSWORD }}
+      CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Get LTW
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          repo: MojoLauncher/LTW
+          workflow: android.yml
+          workflow_conclusion: success
+          name: output-aar
+          path: app_mojo/libs
+
+      - name: Get Mesa
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          repo: CopperLauncher/Mesa-AAR-Builder
+          workflow: build-aar.yml
+          workflow_conclusion: success
+          name: mesa.aar
+          path: app_mojo/libs
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.5"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Create out directory
+        run: mkdir out
+      # Release APKs are built on every branch of the main repo (not for pull requests, they don't get secrets)
+      - name: Decode release keystore
+        if: github.repository_owner == 'NokorLauncher' && github.event_name != 'pull_request'
+        run: |
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app_mojo/mojo_release_next.jks
+          fi
+
+      # The Google Play upload key is only needed where the .aab is published
+      - name: Decode upload keystore
+        if: github.repository_owner == 'NokorLauncher' && (github.ref == 'refs/heads/v3_openjdk' || startsWith(github.ref, 'refs/tags/v'))
+        run: |
+          if [ -n "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > app_mojo/mojo_upload_next.jks
+          fi
+
+      - name: Build Publishing .aab
+        if: github.repository_owner == 'NokorLauncher' && (github.ref == 'refs/heads/v3_openjdk' || startsWith(github.ref, 'refs/tags/v'))
+        run: |
+          gradle :app_mojo:bundleFullGplay
+          mv app_mojo/build/outputs/bundle/fullGplay/app_mojo-full-gplay.aab out/app-gplay.aab
+
+      - name: Build Debug .apk
+        run: |
+          # Build the launcher
+          gradle :app_mojo:assembleFullDebug
+          mv app_mojo/build/outputs/apk/full/debug/app_mojo-full-debug.apk out/app-debug-full.apk
+
+      - name: Build Debug .apk (No runtime)
+        run: |
+          gradle :app_mojo:assembleNoruntimeDebug
+          mv app_mojo/build/outputs/apk/noruntime/debug/app_mojo-noruntime-debug.apk out/app-debug-noruntime.apk
+      - name: Build Release .apk
+        if: github.repository_owner == 'NokorLauncher' && github.event_name != 'pull_request'
+        run: |
+          gradle :app_mojo:assembleFullPubRelease
+          mv app_mojo/build/outputs/apk/full/pubRelease/app_mojo-full-pubRelease.apk out/Nokor-release.apk
+          # Fail the release job if the generated APK is not cryptographically signed.
+          apksigner verify --verbose --print-certs out/Nokor-release.apk
+      - name: Gen md5sums
+        run: |
+          md5sum out/app-debug-full.apk > out/app-debug-full.md5
+          md5sum out/app-debug-noruntime.apk > out/app-debug-noruntime.md5
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: out/app-debug-full.apk
+
+      - name: Upload Debug APK (No runtime)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-noruntime
+          path: out/app-debug-noruntime.apk
+
+      - name: Upload Release APK
+        if: github.repository_owner == 'NokorLauncher' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: out/Nokor-release.apk
+
+      - name: Upload AAB
+        if: github.repository_owner == 'NokorLauncher' && (github.ref == 'refs/heads/v3_openjdk' || startsWith(github.ref, 'refs/tags/v'))
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: out/app-gplay.aab
+
+      # Only v3_openjdk publishes the nightly release, other branches just upload the APK as an artifact
+      - name: Release Nightly APK
+        if: github.repository_owner == 'NokorLauncher' && github.ref == 'refs/heads/v3_openjdk'
+        uses: softprops/action-gh-release@v3
+        with:
+          name: Nokor Nightly Builds
+          prerelease: true
+          tag_name: nightly
+          body: |
+            Nokor nightly build.
+            Commit hash: ${{ github.sha }}
+          files: |
+            out/Nokor-release.apk
+
+      # The launcher reads update/latest_version_md.json to find out that a new build exists.
+      # "code" is the run number, the same number that is the versionCode of the build.
+      - name: Publish update feed
+        if: github.repository_owner == 'NokorLauncher' && github.ref == 'refs/heads/v3_openjdk'
+        shell: bash
+        run: |
+          set -euo pipefail
+          SIZE="$(stat -c %s out/Nokor-release.apk)"
+          URL="https://github.com/${{ github.repository }}/releases/download/nightly/Nokor-release.apk"
+          mkdir -p update
+          jq -n \
+            --argjson code "${{ github.run_number }}" \
+            --arg version "2026.1.1 (build ${{ github.run_number }})" \
+            --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg body "Nokor nightly build. Commit: ${{ github.sha }}" \
+            --arg uri "$URL" \
+            --argjson size "$SIZE" \
+            '{code: $code, version: $version, created_at: $created,
+              default_cloud_drive: null, cloud_drives: [],
+              files: [{file_name: "Nokor-release.apk", uri: $uri, size: $size, arch: "all"}],
+              default_body: {language: "NULL", markdown: $body}, bodies: []}' \
+            > update/latest_version_md.json
+          cat update/latest_version_md.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add update/latest_version_md.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Update feed for build ${{ github.run_number }}"
+          git pull --rebase origin ${{ github.ref_name }}
+          git push origin HEAD:${{ github.ref_name }}
+
+      - name: Upload onto the Google Play testing track
+        continue-on-error: true
+        if: github.repository_owner == 'NokorLauncher' && github.ref == 'refs/heads/v3_openjdk'
+        uses: r0adkll/upload-google-play@v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.SERVICE_JSON }}
+          packageName: com.nokorlauncher.mc
+          releaseFiles: out/app-gplay.aab
+          track: internal
+          inAppUpdatePriority: 5

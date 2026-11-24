@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Address of update/latest_version_md.json of your repository (raw file). The update check is off while it holds YOUR_ . Change the repository name if it is not NokorLauncher -->
+    <string name="update_feed_url" translatable="false">https://raw.githubusercontent.com/NokorLauncher/NokorLauncher/v3_openjdk/update/latest_version_md.json</string>
+
+    <string name="preference_update_auto_title">Check for updates automatically</string>
+    <string name="preference_update_auto_description">Looks for a new version when the launcher starts. On Wi-Fi the update is downloaded in the background.</string>
+    <string name="preference_update_now_title">Check for updates</string>
+    <string name="preference_update_now_description">Current version: %1$s</string>
+
+    <string name="update_available_title">Update available</string>
+    <string name="update_message_versions">New version: %1$s\nInstalled version: %2$s</string>
+    <string name="update_message_size">Size: %1$.1f MB</string>
+    <string name="update_action_download">Download and install</string>
+    <string name="update_action_install">Install</string>
+    <string name="update_action_later">Later</string>
+    <string name="update_action_skip">Skip this version</string>
+    <string name="update_downloading">Downloading the update…</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_up_to_date">The launcher is up to date</string>
+    <string name="update_check_failed">Could not check for updates</string>
+    <string name="update_download_failed">Could not download the update</string>
+    <string name="update_install_failed">Could not start the installer</string>
+    <string name="update_allow_install">Allow this app to install apps, then press the update button again</string>
+    <string name="update_not_configured">The address of the update feed is not set</string>
+    <string name="update_store_build">This version is updated by the store</string>
+</resources>

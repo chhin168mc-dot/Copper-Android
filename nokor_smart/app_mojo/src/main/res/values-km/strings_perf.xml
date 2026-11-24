@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="perf_category">Runtime និងប្រសិទ្ធភាព</string>
+    <string name="perf_runtime_selection_title">ការជ្រើស Java runtime</string>
+    <string name="perf_runtime_selection_auto">ស្វ័យប្រវត្តិ៖ តាមកំណែ Java ដែលហ្គេមត្រូវការ</string>
+    <string name="perf_runtime_selection_manual">ដោយដៃ៖ ប្រើ runtime លំនាំដើម បើវាថ្មីគ្រប់គ្រាន់</string>
+    <string name="perf_runtime_preload_title">ដាស់ runtime ជាមុន</string>
+    <string name="perf_runtime_preload_summary">អានឯកសារ Java runtime ចូល cache របស់ប្រព័ន្ធនៅផ្ទៃខាងក្រោយ មុនហ្គេមចាប់ផ្តើម។ ត្រូវរំលងបើ RAM ទំនេរតិច។</string>
+    <string name="perf_report_switch_title">កត់ត្រាពេលវេលាបើកហ្គេម</string>
+    <string name="perf_report_switch_summary">រក្សាទុកក្នុងឧបករណ៍នេះថាផ្នែកនីមួយៗនៃការបើកហ្គេមចំណាយពេលប៉ុន្មាន។ មិនរក្សាគណនី chat ឬឈ្មោះ world ទេ ហើយរក្សាតែ ៣ ដងចុងក្រោយ។</string>
+    <string name="perf_overview_title">របាយការណ៍ runtime និងប្រសិទ្ធភាព</string>
+    <string name="perf_overview_summary">Runtime ដែលបានដំឡើង ឧបករណ៍នេះ និងពេលវេលាបើកហ្គេមដែលបានរក្សាទុក</string>
+    <string name="perf_overview_device">ឧបករណ៍</string>
+    <string name="perf_overview_runtimes">Java runtimes</string>
+    <string name="perf_overview_renderer">ការណែនាំ renderer</string>
+    <string name="perf_overview_timings">ការបើកហ្គេមចុងក្រោយ</string>
+    <string name="perf_overview_no_timings">មិនទាន់មានការកត់ត្រាទេ។ សូមបើក \"កត់ត្រាពេលវេលាបើកហ្គេម\" ហើយចាប់ផ្តើមហ្គេម។</string>
+    <string name="perf_overview_clear">លុបការកត់ត្រា</string>
+    <string name="perf_runtime_failed_hint">Runtime \"%1$s\" មិនចាប់ផ្តើមទេ។ ការបើកលើកក្រោយនឹងរំលងវា បើមាន runtime ផ្សេងដែលអាចដំណើរការកំណែនេះបាន។</string>
+    <string name="content_check_failed">ឯកសារ %1$s ដែលបានទាញមកប្រើមិនបាន៖ %2$s។ ឯកសារត្រូវបានលុបចេញ។</string>
+    <string name="content_check_empty">ឯកសារទទេ</string>
+    <string name="content_check_not_zip">វាមិនមែនជាឯកសារ ZIP ឬ JAR ត្រឹមត្រូវទេ</string>
+    <string name="content_check_no_pack_mcmeta">វាគ្មាន pack.mcmeta ដូច្នេះ Minecraft នឹងមិនបង្ហាញវាទេ</string>
+    <string name="content_check_no_shaders_folder">វាគ្មានថត shaders ទេ</string>
+    <string name="content_check_hash">checksum របស់វាមិនត្រូវនឹង checksum នៃការទាញទេ</string>
+    <string name="content_shader_warning_message">%1$s ត្រូវការ mod ដែលផ្ទុក shader pack (Iris ឬ OptiFine)។ Shader pack ធ្ងន់ ហើយ renderer %2$s អាចមិនដំណើរការវា៖ %3$s</string>
+    <string name="content_shader_warning_gl4es">GL4ES ផ្តល់តែ OpenGL 2.1 ដូច្នេះ shader pack ភាគច្រើនត្រូវការ core renderer។</string>
+    <string name="content_shader_warning_core">ត្រូវការ core renderer ប៉ុន្តែមិនមែន pack ទាំងអស់ដំណើរការជាមួយ renderer ទាំងអស់ទេ។</string>
+    <string name="content_already_installed">%1$s ត្រូវបានដំឡើងរួចហើយ។</string>
+    <string name="perf_optimize_title">បង្កើនប្រសិទ្ធភាពហ្គេមសម្រាប់ឧបករណ៍នេះ</string>
+    <string name="perf_optimize_summary">ពិនិត្យ memory, resolution និងជម្រើស runtime ធៀបនឹងឧបករណ៍នេះ ហើយបង្ហាញអ្វីដែលវានឹងប្តូរ</string>
+    <string name="perf_optimize_intro">ការកំណត់ទាំងនេះនឹងប្តូរ៖</string>
+    <string name="perf_optimize_none">ការកំណត់របស់អ្នកស័ក្តិសមនឹងឧបករណ៍នេះរួចហើយ។ មិនបានប្តូរអ្វីទេ។</string>
+    <string name="perf_optimize_kept">មិនប្តូរ៖ renderer, ជម្រើសពិសោធន៍ និងអាគុយម៉ង់ Java។</string>
+    <string name="perf_optimize_apply">បង្កើនប្រសិទ្ធភាព</string>
+    <string name="perf_optimize_undo">បោះបង់ការបង្កើនប្រសិទ្ធភាពចុងក្រោយ</string>
+    <string name="perf_optimize_done">បានកែការកំណត់។ អ្នកអាចបោះបង់វាបានពីប៊ូតុងដដែល។</string>
+    <string name="perf_optimize_undone">ការកំណត់ពីមុនត្រឡប់មកវិញ។</string>
+    <string name="perf_opt_memory">Memory</string>
+    <string name="perf_opt_resolution">Render resolution</string>
+    <string name="perf_opt_sustained">Sustained performance</string>
+    <string name="perf_opt_selection">ការជ្រើស Java runtime</string>
+    <string name="perf_opt_preload">ដាស់ runtime ជាមុន</string>
+    <string name="perf_opt_on">បើក</string>
+    <string name="perf_opt_off">បិទ</string>
+    <string name="perf_opt_renderer_tip">ដំបូន្មាន៖ %1$s ត្រូវបានណែនាំសម្រាប់ Minecraft 1.17 ឡើងទៅលើឧបករណ៍នេះ (%2$s)។ អ្នកអាចប្តូរ renderer ក្នុងការកំណត់វីដេអូ។</string>
+</resources>

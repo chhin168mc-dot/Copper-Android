@@ -1,0 +1,147 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="app_name">MobileGlues</string>
+
+    <string name="info_author" translatable="false">Swung, BZLZHH, Tungsten</string>
+    <string name="info_copyright" translatable="false">GNU LGPL-2.1 License</string>
+
+    <string name="menu_item_about">About</string>
+
+    <string name="option_glsl_cache">Max GLSL Cache Size</string>
+    <string name="option_glsl_cache_off">Off</string>
+    <string name="option_glsl_cache_value" translatable="false">%1$d MiB</string>
+    <string name="option_glsl_cache_delete">Delete cached shaders (%1$s)</string>
+    <string name="option_glsl_cache_size_mib" translatable="false">%1$.1f MiB</string>
+    <string name="option_glsl_cache_size_kib" translatable="false">%1$.0f KiB</string>
+    <string name="option_glsl_cache_delete_failed">Could not delete the GLSL cache: %s</string>
+    <string name="option_angle">Use ANGLE as OpenGL ES driver</string>
+    <string name="option_angle_disable_if_possible">Prefer Disabled</string>
+    <string name="option_angle_enable_if_possible">Prefer Enabled</string>
+    <string name="option_angle_disable">Disable</string>
+    <string name="option_angle_enable">Enable</string>
+
+    <string name="option_no_error">OpenGL Error Setting</string>
+    <string name="option_no_error_auto">Auto</string>
+    <string name="option_no_error_enable">Do not ignore</string>
+    <string name="option_no_error_disable_pri">Ignore shader/program error</string>
+    <string name="option_no_error_disable_sec">Ignore shader/program/framebuffer error</string>
+
+    <string name="option_multidraw">MultiDraw strategy order</string>
+    <string name="md_summary_default">Default order</string>
+    <string name="md_summary_global_default">Default global order</string>
+    <string name="md_summary_global_custom">Custom global order</string>
+    <string name="md_summary_exception_count">%1$d exception(s)</string>
+    <string name="md_order_hint">Higher means preferred; a strategy that fails at runtime degrades along the same order.</string>
+    <string name="md_order_drag_handle">Drag to reorder</string>
+    <string name="md_item_native">Native / Native EXT</string>
+    <string name="md_item_native_desc">Matches the same-shaped GLES core or extension function, when one exists</string>
+    <string name="md_exceptions_group">Per-function exceptions</string>
+    <string name="md_exception_on">Independent order</string>
+    <string name="md_exception_off">Follows the global order</string>
+    <string name="md_bench_run_all">Benchmark every function</string>
+    <string name="md_bench_run_entry">Benchmark this function</string>
+    <string name="md_bench_nothing">no strategy could be measured on this device</string>
+    <string name="md_reset_default">Restore default</string>
+    <string name="md_bench_running_title">Benchmark</string>
+    <string name="md_bench_running_msg">Measuring each strategy in turn. The base budget is about 8 seconds, but readings that will not settle grow the scene and get measured again, so an unsteady device can take a couple of minutes. The screen is kept on for the duration; please leave the device idle.</string>
+    <string name="md_bench_result_title">Benchmark results</string>
+    <string name="md_bench_result_all_intro">Each function was measured separately and sorted fastest first (×1.00 is fastest within that function). Adopting enables an independent order for each function below; the global order is unchanged.</string>
+    <string name="md_bench_result_entry_intro">Strategies for %1$s, sorted fastest first by measured cost (×1.00 is fastest). Adopt as this function\'s independent order?</string>
+    <string name="md_bench_cost">×%1$s</string>
+    <string name="md_bench_unmeasured">Not measurable on this device; placed last</string>
+    <string name="md_bench_quality">%1$d rounds per strategy, run-to-run spread ±%2$s%%</string>
+    <string name="md_bench_noisy">Measured %1$d times; the spread never reached the ±15%% required for a confident ranking. The steadiest run was ±%2$s%%. Strategies with similar results may be ordered incorrectly. Re-running with the device idle and cool will give a better result.</string>
+    <string name="md_bench_running_retry">Spread too wide to rank. Re-measuring on a larger scene (%1$d/%2$d)…</string>
+    <string name="md_bench_single_candidate">Only one strategy could be measured for this function. There is no ordering to speak of; the figure is informational.</string>
+    <string name="md_bench_running_smaller">GL context lost; that run is void. Restarting at %1$d sections…</string>
+    <string name="md_bench_adopt_anyway">Adopt anyway</string>
+    <string name="md_bench_adopt">Adopt</string>
+    <string name="md_bench_discard">Discard</string>
+    <string name="md_bench_failed">Benchmark failed: %1$s</string>
+
+    <string name="md_bench_outdated">The GLES driver has changed. The current MultiDraw order was measured on the previous driver; re-running the benchmark is recommended.</string>
+    <string name="md_bench_outdated_action">Benchmark</string>
+    <string name="md_home_untuned">MultiDraw is using the default order</string>
+    <string name="md_home_untuned_desc">The default order reflects what is usually fastest, not what is fastest on this device. A benchmark measures each function here and sorts it accordingly.</string>
+
+    <string name="md_angle_title">Borrow ANGLE from a launcher</string>
+    <string name="md_angle_intro">Your settings run MobileGlues on ANGLE, but ANGLE ships with the launcher rather than with this app. To measure the driver the game actually uses, the benchmark must load ANGLE from an installed launcher.</string>
+    <string name="md_angle_trust"><![CDATA[<b>Choose a source you fully trust.</b> Its native code will be loaded into this app\'s process and run with this app\'s permissions. Select only a launcher you installed yourself from a trusted source.]]></string>
+    <string name="md_angle_source_version">version %1$s</string>
+    <string name="md_angle_none">No installed launcher carrying ANGLE was found. Install one (Fold Craft Launcher or Zalith Launcher), or benchmark on the system driver — note that this is not the driver the game will use.</string>
+    <string name="md_angle_skip">Use the system driver</string>
+    <string name="md_angle_last_used">Last used</string>
+    <string name="md_glinfo_needs_angle">Read from the system driver. Your settings run the game on ANGLE, so the extensions and limits below are not the ones MobileGlues will see.</string>
+    <string name="md_glinfo_borrow">Borrow ANGLE and read again</string>
+    <string name="md_glinfo_borrowed">Read through ANGLE borrowed from a launcher.</string>
+    <string name="md_glinfo_borrow_ineffective">The borrowed ANGLE was not used (device unsupported, or it failed to load); this page describes the system driver.</string>
+    <string name="md_bench_wrong_driver">Measured on the system driver, but the game runs on ANGLE. This order does not apply.</string>
+    <string name="md_bench_context_lost">The driver lost the GL context, and continued to do so at smaller scene sizes. The run was abandoned; nothing measured after the loss is valid.</string>
+    <string name="md_bench_process_died">The query process terminated: the renderer failed on this driver. No results were produced.</string>
+    <string name="md_bench_borrow_failed">The borrowed ANGLE could not be loaded. This run measured the system driver, not the driver the game will use.</string>
+    <string name="md_bench_borrow_unsupported">This device cannot run ANGLE, so the borrow was ignored. The game will also use the system driver, so this order still applies.</string>
+
+    <string name="md_backend_unroll">Draw one by one</string>
+    <string name="md_backend_basevertex" translatable="false">BaseVertex</string>
+    <string name="md_backend_indirect" translatable="false">Indirect</string>
+    <string name="md_backend_multiarrays" translatable="false">MultiArrays</string>
+    <string name="md_backend_multibasevertex" translatable="false">MultiBaseVertex</string>
+    <string name="md_backend_multiindirect" translatable="false">MultiIndirect</string>
+    <string name="md_backend_compute">Compute shader</string>
+
+    <string name="option_angle_clear_workaround">ANGLE Depth Clear Workaround</string>
+    <string name="option_angle_clear_workaround_disable">Disable</string>
+    <string name="option_angle_clear_workaround_enable_1">Enable workaround #1</string>
+
+    <string name="option_ext_cs">Enable Incomplete \'ARB_compute_shader\' Extension</string>
+    <string name="option_ext_timer_query">Disable Recommended \'timer_query\' Extension</string>
+    <string name="option_ext_direct_state_access">Enable Advanced \'direct_state_access\' Extension</string>
+    <string name="option_enable_fsr1" tools:ignore="Typos">(Experimental) Enable built-in FSR1</string>
+
+    <string name="option_custom_gl_version">Custom target OpenGL Version</string>
+    <string name="option_custom_gl_version_default">Disable</string>
+    <string name="warning_enabling_custom_gl_version"><![CDATA[<b><big>⚠️ Important Notice:</big></b><br/><br/>
+ • Setting a custom OpenGL version may <b><font color="@colorError">cause game crashes or rendering issues — proceed with caution</font></b>!<br/>
+ • If any issues occur, please <b><font color="@colorError">disable this feature</font></b> first!<br/>
+ • Once you enable this feature, we will <b><font color="@colorError">no longer accept</font></b> any bug reports related to additional issues! Before reporting problems, please make sure to <b><font color="@colorError">disable this feature</font></b>!<br/>
+ • For stability, <b>do not enable this feature</b> unless absolutely necessary (e.g., mods requiring specific OpenGL versions)!]]></string>
+
+    <string name="dialog_negative">Cancel</string>
+    <string name="dialog_github">GitHub source</string>
+    <string name="repo_release">Release repository</string>
+    <string name="repo_renderer" translatable="false">MobileGlues</string>
+
+    <string name="config_save_failed">Failed to save settings: %s</string>
+    <string name="dialog_config_corrupt_title">Damaged configuration file</string>
+    <string name="dialog_config_corrupt_message">MG/config.json could not be parsed, so it has not been touched. A copy has been kept as \'%1$s\'.\n\nDetails: %2$s\n\nYou can reset the settings to their defaults, or cancel and repair the file yourself.</string>
+    <string name="dialog_config_corrupt_reset">Reset to defaults</string>
+
+    <string name="dialog_title_warning">Warning</string>
+    <string name="warning_ext_cs_enable">Enabling the incomplete ARB_compute_shader extension may cause issues with some shaders and mods. Are you sure you want to continue?</string>
+    <string name="warning_adreno_740_angle">Enabling ANGLE on Adreno 740 devices is highly likely to cause severe rendering issues. Are you sure you want to continue?</string>
+    <string name="warning_enabling_angle_clear_workaround">Enabling the ANGLE Depth Clear Workaround fixes the issue of the handheld items being obscured in vanilla Minecraft 1.21.5+, but may cause performance degradation. Are you sure you want to continue?</string>
+    <string name="warning_fsr1_enable">Enabling the built-in FSR1 may cause image corruption on some drivers.\nIf your device is equipped with an Adreno GPU, please enable ANGLE to ensure correct rendering.\nIt is known that enabling this feature together with ANGLE can cause performance degradation, so please enable with caution.</string>
+
+    <string name="ok">OK</string>
+    <string name="ok_with_countdown">OK (%d s)</string>
+    <string name="info_mg_info">MobileGlues Info</string>
+
+    <string name="settings_group_render">Rendering</string>
+    <string name="settings_group_cache">Shader cache</string>
+    <string name="settings_group_ext">Extensions</string>
+    <string name="settings_group_advanced">Advanced</string>
+
+    <string name="info_section_about">About</string>
+    <string name="info_section_details">Information</string>
+
+    <string name="copy">Copy</string>
+    <string name="copied">Copied</string>
+
+    <string name="md_global_order_title">Global order</string>
+    <string name="mg_about_developers">Developers</string>
+    <string name="mg_about_license">License</string>
+    <string name="mg_credits_title">Credits</string>
+    <string name="mg_credits_summary">Contributors and third-party projects, opens in your browser</string>
+    <string name="mg_reset_title">Reset MobileGlues settings</string>
+    <string name="mg_reset_summary">Restore every renderer option to its default</string>
+    <string name="mg_reset_message">All MobileGlues renderer settings, including the MultiDraw order, go back to their defaults. Cached shaders are kept.</string>
+</resources>

@@ -1,0 +1,78 @@
+# Add project specific ProGuard rules here.
+# By default, the flags in this file are appended to flags specified
+# in C:\tools\adt-bundle-windows-x86_64-20131030\sdk/tools/proguard/proguard-android.txt
+# You can edit the include path and order by changing the proguardFiles
+# directive in build.gradle.
+#
+# For more details, see
+#   http://developer.android.com/guide/developing/tools/proguard.html
+
+# Add any project specific keep options here:
+
+# If your project uses WebView with JS, uncomment the following
+# and specify the fully qualified class name to the JavaScript interface
+# class:
+#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
+#   public *;
+#}
+
+# We use Reflection on the builder to avoid creating too many objects
+ -keep class net.objecthunter.exp4j.ExpressionBuilder**
+ -keepclassmembers class net.objecthunter.exp4j.ExpressionBuilder** {
+    *;
+ }
+# Option screens
+ -keep class git.artdeell.mojo.prefs.screens** {*;}
+
+# File dialog bridge: methods are looked up by name from native code
+ -keep class git.artdeell.mojo.game.platform.dialog.FileDialogBridge { *; }
+ -keep class git.artdeell.mojo.game.platform.dialog.SDLFileDialogHandler { *; }
+
+
+# Home screen tiles are saved as JSON with Gson, the field names must stay
+ -keep class git.artdeell.mojo.home.HomeTile { *; }
+
+
+# ---------------------------------------------------------------------------
+# Nokor release hardening
+# ---------------------------------------------------------------------------
+
+# The bundled Java AWT compatibility layer is accessed by JNI using fixed
+# class/method names. Never rename or remove these classes.
+-keep class java.awt.** { *; }
+-keep class sun.awt.** { *; }
+-keep class sun.java2d.** { *; }
+-keep class java.beans.** { *; }
+
+# JNI entry points are resolved by their original Java class and method names.
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
+
+# JNI code refers to these application classes by hard-coded binary names.
+-keep class git.artdeell.mojo.utils.JREUtils { *; }
+-keep class git.artdeell.mojo.CallbackBridge { *; }
+-keep class git.artdeell.mojo.Logger { *; }
+-keep class git.artdeell.mojo.Logger$eventLogListener { *; }
+-keep class git.artdeell.mojo.mobileglues.MGInfoGetter { *; }
+-keep class git.artdeell.mojo.mobileglues.MGBench { *; }
+
+# Preserve metadata needed by reflection, Kotlin, annotations and stack traces.
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# Keep names of classes used by service/provider/manifest instantiation and
+# serialized model types; Android Gradle Plugin also handles manifest roots.
+-keep class * extends android.app.Service { *; }
+-keep class * extends android.content.ContentProvider { *; }
+-keep class * extends android.app.Application { *; }
+-keep class * extends android.app.Activity { *; }
+
+# Keep Gson model field names where JSON schemas depend on them.
+-keepclassmembers class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+
+# Nokor Minecraft options optimizer is called from Java game launch flow.
+-keep class git.artdeell.mojo.perf.MinecraftOptionsOptimizer { public *; }
+-keep class git.artdeell.mojo.perf.SmartFpsOptimizer { *; }
