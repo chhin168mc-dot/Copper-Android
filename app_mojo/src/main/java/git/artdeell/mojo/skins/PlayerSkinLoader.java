@@ -47,12 +47,15 @@ public final class PlayerSkinLoader {
         @NonNull public final String name;
         /** Identifies the account and the skin, so a screen can tell if it already shows this one */
         @NonNull public final String key;
+        /** The cape picked in the skin editor, null for none */
+        @Nullable public final Bitmap cape;
 
-        Result(@NonNull Bitmap skin, boolean slim, @NonNull String name, @NonNull String key) {
+        Result(@NonNull Bitmap skin, boolean slim, @NonNull String name, @NonNull String key, @Nullable Bitmap cape) {
             this.skin = skin;
             this.slim = slim;
             this.name = name;
             this.key = key;
+            this.cape = cape;
         }
     }
 
@@ -64,7 +67,7 @@ public final class PlayerSkinLoader {
                 result = loadBlocking();
             } catch (Throwable t) {
                 Log.w(TAG, "Could not load the skin", t);
-                result = steve("Steve");
+                result = steve("Steve", null, "");
             }
             Result done = result;
             MAIN.post(() -> callback.onLoaded(done));
@@ -74,32 +77,54 @@ public final class PlayerSkinLoader {
     @NonNull
     private static Result loadBlocking() {
         Account account = Accounts.getCurrent();
-        if (account == null) return steve("Steve");
+        if (account == null) return steve("Steve", null, "");
         String name = account.username == null ? "Steve" : account.username;
         AuthType type = account.authType == null ? AuthType.LOCAL : account.authType;
 
         // The skin picked in the skin editor is the newest, the skin services lag behind an upload
         String libraryKey = type == AuthType.LOCAL ? SkinLibrary.localKey(name) : account.profileId;
+        String capeId = libraryKey == null ? null : SkinLibrary.getSelectedCape(libraryKey);
+        Bitmap cape = loadCape(capeId);
+        // The key changes with the cape, so the home screen redraws when another one is picked
+        String capeKey = cape == null ? "" : ":cape:" + capeId;
         if (libraryKey != null) {
             SkinLibrary.Entry entry = SkinLibrary.find(SkinLibrary.getSelected(libraryKey));
             if (entry != null) {
                 Bitmap bitmap = BitmapFactory.decodeFile(SkinLibrary.fileOf(entry).getAbsolutePath());
-                if (bitmap != null) return new Result(bitmap, entry.slim, name, type.name() + ":" + name + ":" + entry.id);
+                if (bitmap != null) return new Result(bitmap, entry.slim, name, type.name() + ":" + name + ":" + entry.id + capeKey, cape);
             }
         }
 
         if (type.skinUrl != null) {
             Bitmap bitmap = loadOnline(type, name);
             if (bitmap != null) {
-                return new Result(bitmap, SkinTextures.looksSlim(bitmap), name, type.name() + ":" + name + ":online");
+                return new Result(bitmap, SkinTextures.looksSlim(bitmap), name, type.name() + ":" + name + ":online" + capeKey, cape);
             }
         }
-        return steve(name);
+        return steve(name, cape, capeKey);
     }
 
     @NonNull
-    private static Result steve(@NonNull String name) {
-        return new Result(DefaultSkins.steve(), false, name, "steve:" + name);
+    private static Result steve(@NonNull String name, @Nullable Bitmap cape, @NonNull String capeKey) {
+        return new Result(DefaultSkins.steve(), false, name, "steve:" + name + capeKey, cape);
+    }
+
+    /** The texture of the cape with this id: official and custom capes of the library, or the Microsoft cape the editor cached */
+    @Nullable
+    private static Bitmap loadCape(@Nullable String capeId) {
+        if (capeId == null) return null;
+        Bitmap bitmap = null;
+        try {
+            byte[] data = CapeCatalog.loadAny(capeId);
+            bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+        } catch (IOException | RuntimeException e) {
+            Log.w(TAG, "Could not read the cape " + capeId, e);
+        }
+        if (bitmap == null) {
+            File cached = new File(new File(Tools.DIR_CACHE, "capes"), capeId + ".png");
+            if (cached.exists()) bitmap = BitmapFactory.decodeFile(cached.getAbsolutePath());
+        }
+        return bitmap;
     }
 
     @Nullable

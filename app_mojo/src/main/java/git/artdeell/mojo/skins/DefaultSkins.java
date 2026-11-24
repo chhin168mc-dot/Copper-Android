@@ -43,6 +43,16 @@ public final class DefaultSkins {
         return drawSteve();
     }
 
+    /** PNG of the default skin, for the local skin server that gives it to the game */
+    @NonNull
+    public static synchronized byte[] steveBytes() {
+        Bitmap bitmap = steve();
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+        bitmap.recycle();
+        return out.toByteArray();
+    }
+
     @NonNull
     private static Bitmap drawSteve() {
         Bitmap bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888);

@@ -158,6 +158,7 @@ public class GameRunner {
     public static void launchGame(final AppCompatActivity activity, Account account,
                                   Instance instance, String versionId, File[] classpath, GameRenderer gameRenderer) throws Throwable {
         if(!performAuthPing(activity, account)) account = account.toLocal();
+        git.artdeell.mojo.skins.DefaultSkins.init(activity);
 
         int freeDeviceMemory = Tools.getFreeDeviceMemory(activity);
         int freeAddressSpace = Architecture.is32BitsDevice() ? Tools.getMaxContinuousAddressSpaceSize() : -1;

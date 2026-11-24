@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory;
 import android.util.Log;
 
 import git.artdeell.mojo.Tools;
+import git.artdeell.mojo.skins.DefaultSkins;
 import git.artdeell.mojo.authenticator.AuthType;
 import git.artdeell.mojo.utils.FileUtils;
 import git.artdeell.mojo.utils.JSONUtils;
@@ -118,11 +119,23 @@ public class Account {
     public Bitmap getSkinFace(){
         if(isLocal() && authType != AuthType.LOCAL) return null;
         File skinFaceFile = getSkinFaceFile();
-        if(!skinFaceFile.exists()) return null;
+        if(!skinFaceFile.exists()) return defaultSkinFace();
         if(mFaceCache == null) {
             mFaceCache = BitmapFactory.decodeFile(skinFaceFile.getAbsolutePath());
         }
         return mFaceCache;
+    }
+
+    private static Bitmap sDefaultFace;
+
+    /** The head of the default skin (Steve), for accounts that have no skin yet */
+    private static synchronized Bitmap defaultSkinFace() {
+        if(sDefaultFace == null) {
+            Bitmap skin = DefaultSkins.steve();
+            sDefaultFace = new SkinHeadRenderer().render(100, skin);
+            skin.recycle();
+        }
+        return sDefaultFace;
     }
 
     /** Drops the saved avatar, used when a local account has no skin selected anymore */

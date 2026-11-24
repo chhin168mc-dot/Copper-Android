@@ -10,6 +10,7 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.MotionEvent;
 import android.view.View;
@@ -568,6 +569,8 @@ public class MainMenuFragment extends Fragment {
         // Quick Actions
         Button mNewsButton = view.findViewById(R.id.news_button);
         Button mDiscordButton = view.findViewById(R.id.social_media_button);
+        // The menu paints every icon white, the Telegram icon has its own colors
+        if (mDiscordButton != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) mDiscordButton.setCompoundDrawableTintList(null);
         Button mCustomControlButton = view.findViewById(R.id.custom_control_button);
         Button mInstallJarButton = view.findViewById(R.id.install_jar_button);
         Button mShareLogsButton = view.findViewById(R.id.share_logs_button);
@@ -648,7 +651,11 @@ public class MainMenuFragment extends Fragment {
 
     /** The button, the swipe from the left edge and the dimmed area that open and close the menu */
     private void setupQuickMenu() {
-        if (mMenuButton != null) mMenuButton.setOnClickListener(v -> openQuickMenu());
+        if (mMenuButton != null) mMenuButton.setOnClickListener(v -> {
+            // One tap opens the menu, the next one closes it
+            if (mMenuOpen) closeQuickMenu();
+            else openQuickMenu();
+        });
         if (mMenuScrim != null) mMenuScrim.setOnClickListener(v -> closeQuickMenu());
         if (mMenuEdge != null) {
             final float threshold = 32f * getResources().getDisplayMetrics().density;

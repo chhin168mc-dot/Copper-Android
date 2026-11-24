@@ -96,7 +96,11 @@ public final class LocalSkinServer {
             }
         }
 
-        if (skin == null && cape == null) return null;
+        // No skin picked: the game gets the default skin (Steve) instead of the one its UUID would give
+        if (skin == null) {
+            skin = DefaultSkins.steveBytes();
+            slim = false;
+        }
 
         try {
             if (sInstance == null) sInstance = new LocalSkinServer();

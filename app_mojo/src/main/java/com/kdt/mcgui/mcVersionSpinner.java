@@ -174,6 +174,7 @@ public class mcVersionSpinner extends ExtendedTextView {
             }
         });
 
+        PopupImmersive.keep(mListView);
         mPopupWindow = new PopupWindow(mListView, MATCH_PARENT, getContext().getResources().getDimensionPixelOffset(R.dimen._184sdp));
         mPopupWindow.setElevation(5);
         mPopupWindow.setClippingEnabled(false);

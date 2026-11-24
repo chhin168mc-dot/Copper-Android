@@ -148,6 +148,9 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
         reload();
 
         setBackgroundColor(ThemeColors.surfaceContainer(getContext()));
+        // The spinner style keeps room for a dropdown arrow that is not drawn: it pushed the pencil away from the menu button
+        setPaddingRelative(getPaddingStart(), getPaddingTop(), 0, getPaddingBottom());
+        git.artdeell.mojo.skins.DefaultSkins.init(getContext());
         mLoginBarPaint.setColor(ThemeColors.primary(getContext()));
         mLoginBarPaint.setStrokeWidth(getResources().getDimensionPixelOffset(R.dimen._2sdp));
         mLoginStepAnimator.addUpdateListener(this);

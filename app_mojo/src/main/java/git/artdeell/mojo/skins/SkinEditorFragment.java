@@ -230,6 +230,8 @@ public class SkinEditorFragment extends Fragment {
         try {
             result.account = MinecraftSkinApi.ensureFreshSession(result.account);
             result.profile = MinecraftSkinApi.fetchProfile(result.account.accessToken);
+            // The home screen shows this cape on the player
+            rememberCape(result.account.profileId, result.profile.activeCapeId());
         } catch (IOException e) {
             // Offline: the local skins can still be browsed
             result.error = e;
@@ -256,6 +258,15 @@ public class SkinEditorFragment extends Fragment {
             } catch (IOException ignored) {
                 // A missing cape image only means a blank tile
             }
+        }
+    }
+
+    private static void rememberCape(@Nullable String profileId, @Nullable String capeId) {
+        if (profileId == null) return;
+        try {
+            SkinLibrary.setSelectedCape(profileId, capeId);
+        } catch (IOException ignored) {
+            // Only the home screen preview depends on it
         }
     }
 
@@ -356,6 +367,11 @@ public class SkinEditorFragment extends Fragment {
     private void showSkinInPreview(@Nullable SkinLibrary.Entry entry) {
         Bitmap bitmap = entry == null ? null
                 : BitmapFactory.decodeFile(SkinLibrary.fileOf(entry).getAbsolutePath());
+        if (bitmap == null) {
+            // No skin added yet: the default skin is shown, with the cape on it
+            DefaultSkins.init(requireContext());
+            bitmap = DefaultSkins.steve();
+        }
         mPreview.setSkin(bitmap, entry != null && entry.slim);
         if (bitmap != null) bitmap.recycle(); // the preview keeps its own normalized copy
         mIgnoreSlimCallback = true;
@@ -720,6 +736,7 @@ public class SkinEditorFragment extends Fragment {
             try {
                 fresh = MinecraftSkinApi.ensureFreshSession(account);
                 MinecraftSkinApi.setActiveCape(fresh.accessToken, newId);
+                rememberCape(fresh.profileId, newId);
             } catch (Exception e) {
                 error = e;
             }

@@ -101,6 +101,7 @@ public class RightPaneHomeFragment extends Fragment {
             if (result.key.equals(mShownKey)) return;
             mShownKey = result.key;
             mPlayer.setSkin(result.skin, result.slim);
+            mPlayer.setCape(result.cape);
         });
     }
 
