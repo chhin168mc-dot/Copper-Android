@@ -940,4 +940,8 @@
     <string name="preference_tiles_infinite_summary">On: both sides always have an empty row below the tiles, so you can keep adding tiles and scroll to them. Off: tiles can only go where there is room on the screen or between the ones that are there.</string>
     <string name="quick_menu_title">Menu</string>
     <string name="skin_editor_no_account">Add an account first to pick a cape</string>
+    <string name="nokor_mc_optimize_title">Optimize Minecraft automatically</string>
+    <string name="nokor_mc_optimize_summary">Applies a low-cost video profile when launching a game. The original options.txt is backed up.</string>
+    <string name="nokor_smart_fps_title">Smart FPS Optimizer</string>
+    <string name="nokor_smart_fps_summary">Choose render distance and resolution automatically for your device before each game launch. Restart the game to apply changes.</string>
 </resources>

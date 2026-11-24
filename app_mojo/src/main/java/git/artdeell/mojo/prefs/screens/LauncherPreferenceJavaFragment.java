@@ -4,11 +4,15 @@ import static git.artdeell.mojo.Architecture.is32BitsDevice;
 import static git.artdeell.mojo.Tools.getTotalDeviceMemory;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.preference.EditTextPreference;
+import androidx.preference.ListPreference;
+import androidx.preference.SwitchPreferenceCompat;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
@@ -19,11 +23,14 @@ import git.artdeell.mojo.contracts.OpenDocumentWithExtension;
 import git.artdeell.mojo.multirt.MultiRTConfigDialog;
 import git.artdeell.mojo.multirt.RuntimeManager;
 import git.artdeell.mojo.perf.DeviceProfile;
+import git.artdeell.mojo.perf.GameOptimizer;
 import git.artdeell.mojo.perf.PerfRecorder;
 import git.artdeell.mojo.perf.RendererAdvisor;
 import git.artdeell.mojo.prefs.CustomSeekBarPreference;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.prefs.RamInputDialog;
+
+import java.util.List;
 
 public class LauncherPreferenceJavaFragment extends LauncherPreferenceFragment {
     private MultiRTConfigDialog mDialogScreen;
@@ -67,10 +74,103 @@ public class LauncherPreferenceJavaFragment extends LauncherPreferenceFragment {
             return true;
         });
 
+        requirePreference("perf_optimize").setOnPreferenceClickListener(preference->{
+            showOptimizeDialog();
+            return true;
+        });
+
         requirePreference("perf_overview").setOnPreferenceClickListener(preference->{
             showPerformanceOverview();
             return true;
         });
+    }
+
+    /** Works out the changes in the background, then asks the player before anything is written */
+    private void showOptimizeDialog() {
+        final Context context = requireContext();
+        MojoApplication.sExecutorService.execute(() -> {
+            final DeviceProfile device = DeviceProfile.detect(context);
+            final SharedPreferences prefs = LauncherPreferences.DEFAULT_PREF;
+            final List<GameOptimizer.Change> changes = GameOptimizer.plan(new GameOptimizer.Inputs(
+                    device.totalRamMb, device.cores, device.is32Bit, device.recommendedHeapMb(),
+                    LauncherPreferences.PREF_RAM_ALLOCATION,
+                    Math.round(LauncherPreferences.PREF_SCALE_FACTOR * 100f),
+                    LauncherPreferences.PREF_SUSTAINED_PERFORMANCE,
+                    prefs.getString(RuntimeManager.PREF_SELECTION, RuntimeManager.SELECTION_AUTO),
+                    prefs.getBoolean(RuntimeManager.PREF_PRELOAD, true)));
+            final RendererAdvisor.Advice core = RendererAdvisor.advise(context, device, true);
+            Tools.runOnUiThread(() -> {
+                if (!isAdded()) return;
+                StringBuilder message = new StringBuilder();
+                if (changes.isEmpty()) {
+                    message.append(context.getString(R.string.perf_optimize_none));
+                } else {
+                    message.append(context.getString(R.string.perf_optimize_intro)).append("\n");
+                    for (GameOptimizer.Change change : changes) {
+                        message.append("\n• ").append(optimizeLabel(context, change.key)).append(": ")
+                                .append(optimizeValue(context, change, change.before)).append(" → ")
+                                .append(optimizeValue(context, change, change.after));
+                    }
+                }
+                if (!core.rendererId.equals(LauncherPreferences.PREF_RENDERER)) {
+                    message.append("\n\n").append(context.getString(R.string.perf_opt_renderer_tip,
+                            core.rendererId, core.reason));
+                }
+                message.append("\n\n").append(context.getString(R.string.perf_optimize_kept));
+
+                MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context)
+                        .setTitle(R.string.perf_optimize_title)
+                        .setMessage(message.toString());
+                if (changes.isEmpty()) {
+                    builder.setPositiveButton(android.R.string.ok, null);
+                } else {
+                    builder.setPositiveButton(R.string.perf_optimize_apply, (d, w) -> {
+                        GameOptimizer.apply(prefs, changes);
+                        optimizeApplied(context, R.string.perf_optimize_done);
+                    }).setNegativeButton(android.R.string.cancel, null);
+                }
+                if (GameOptimizer.hasBackup(prefs)) {
+                    builder.setNeutralButton(R.string.perf_optimize_undo, (d, w) -> {
+                        GameOptimizer.restore(prefs);
+                        optimizeApplied(context, R.string.perf_optimize_undone);
+                    });
+                }
+                builder.show();
+            });
+        });
+    }
+
+    /** The settings are written: load them and show them in the rows of this screen */
+    private void optimizeApplied(Context context, int messageRes) {
+        LauncherPreferences.loadPreferences(context);
+        SharedPreferences prefs = LauncherPreferences.DEFAULT_PREF;
+        CustomSeekBarPreference memory = findPreference("allocation");
+        if (memory != null) memory.setValue(prefs.getInt("allocation", LauncherPreferences.PREF_RAM_ALLOCATION));
+        ListPreference selection = findPreference(RuntimeManager.PREF_SELECTION);
+        if (selection != null) selection.setValue(prefs.getString(RuntimeManager.PREF_SELECTION, RuntimeManager.SELECTION_AUTO));
+        SwitchPreferenceCompat preload = findPreference(RuntimeManager.PREF_PRELOAD);
+        if (preload != null) preload.setChecked(prefs.getBoolean(RuntimeManager.PREF_PRELOAD, true));
+        Toast.makeText(context, messageRes, Toast.LENGTH_LONG).show();
+    }
+
+    private static String optimizeLabel(Context context, String key) {
+        switch (key) {
+            case GameOptimizer.KEY_MEMORY: return context.getString(R.string.perf_opt_memory);
+            case GameOptimizer.KEY_RESOLUTION: return context.getString(R.string.perf_opt_resolution);
+            case GameOptimizer.KEY_SUSTAINED: return context.getString(R.string.perf_opt_sustained);
+            case GameOptimizer.KEY_RUNTIME_SELECTION: return context.getString(R.string.perf_opt_selection);
+            case GameOptimizer.KEY_RUNTIME_PRELOAD: return context.getString(R.string.perf_opt_preload);
+            default: return key;
+        }
+    }
+
+    private static String optimizeValue(Context context, GameOptimizer.Change change, Object value) {
+        if (change.type == GameOptimizer.BOOL) {
+            return context.getString((Boolean) value ? R.string.perf_opt_on : R.string.perf_opt_off);
+        }
+        if (GameOptimizer.KEY_MEMORY.equals(change.key)) return value + " MB";
+        if (GameOptimizer.KEY_RESOLUTION.equals(change.key)) return value + "%";
+        return String.valueOf(value);
     }
 
     /** Builds the report in the background (the GPU query can take a moment) and shows it */

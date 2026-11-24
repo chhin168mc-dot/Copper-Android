@@ -114,9 +114,10 @@ android {
         }
 
         release {
-            // Don't set to true or java.awt will be a.a or something similar.
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Release builds use R8. JNI/reflection-sensitive classes are kept in proguard-rules.pro.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // defaultConfig already set
             // multiDexEnabled = true
             // debuggable = true

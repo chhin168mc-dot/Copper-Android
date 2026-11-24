@@ -27,4 +27,21 @@
     <string name="content_shader_warning_gl4es">GL4ES only gives OpenGL 2.1, most shader packs need a core renderer.</string>
     <string name="content_shader_warning_core">a core renderer is required, but not every pack works with every renderer.</string>
     <string name="content_already_installed">%1$s is already installed.</string>
+    <string name="perf_optimize_title">Optimize game for this device</string>
+    <string name="perf_optimize_summary">Checks memory, render resolution and runtime options against this device and shows what it would change</string>
+    <string name="perf_optimize_intro">These settings will change:</string>
+    <string name="perf_optimize_none">Your settings already suit this device. Nothing was changed.</string>
+    <string name="perf_optimize_kept">Not changed: the renderer, the experimental options and the Java arguments.</string>
+    <string name="perf_optimize_apply">Optimize</string>
+    <string name="perf_optimize_undo">Undo last optimization</string>
+    <string name="perf_optimize_done">Settings optimized. You can undo it from the same button.</string>
+    <string name="perf_optimize_undone">The previous settings are back.</string>
+    <string name="perf_opt_memory">Memory</string>
+    <string name="perf_opt_resolution">Render resolution</string>
+    <string name="perf_opt_sustained">Sustained performance</string>
+    <string name="perf_opt_selection">Java runtime selection</string>
+    <string name="perf_opt_preload">Runtime warm-up</string>
+    <string name="perf_opt_on">on</string>
+    <string name="perf_opt_off">off</string>
+    <string name="perf_opt_renderer_tip">Tip: %1$s is suggested for Minecraft 1.17 and newer on this device (%2$s). You can change the renderer in the video settings.</string>
 </resources>

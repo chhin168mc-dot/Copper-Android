@@ -27,4 +27,21 @@
     <string name="content_shader_warning_gl4es">GL4ES ផ្តល់តែ OpenGL 2.1 ដូច្នេះ shader pack ភាគច្រើនត្រូវការ core renderer។</string>
     <string name="content_shader_warning_core">ត្រូវការ core renderer ប៉ុន្តែមិនមែន pack ទាំងអស់ដំណើរការជាមួយ renderer ទាំងអស់ទេ។</string>
     <string name="content_already_installed">%1$s ត្រូវបានដំឡើងរួចហើយ។</string>
+    <string name="perf_optimize_title">បង្កើនប្រសិទ្ធភាពហ្គេមសម្រាប់ឧបករណ៍នេះ</string>
+    <string name="perf_optimize_summary">ពិនិត្យ memory, resolution និងជម្រើស runtime ធៀបនឹងឧបករណ៍នេះ ហើយបង្ហាញអ្វីដែលវានឹងប្តូរ</string>
+    <string name="perf_optimize_intro">ការកំណត់ទាំងនេះនឹងប្តូរ៖</string>
+    <string name="perf_optimize_none">ការកំណត់របស់អ្នកស័ក្តិសមនឹងឧបករណ៍នេះរួចហើយ។ មិនបានប្តូរអ្វីទេ។</string>
+    <string name="perf_optimize_kept">មិនប្តូរ៖ renderer, ជម្រើសពិសោធន៍ និងអាគុយម៉ង់ Java។</string>
+    <string name="perf_optimize_apply">បង្កើនប្រសិទ្ធភាព</string>
+    <string name="perf_optimize_undo">បោះបង់ការបង្កើនប្រសិទ្ធភាពចុងក្រោយ</string>
+    <string name="perf_optimize_done">បានកែការកំណត់។ អ្នកអាចបោះបង់វាបានពីប៊ូតុងដដែល។</string>
+    <string name="perf_optimize_undone">ការកំណត់ពីមុនត្រឡប់មកវិញ។</string>
+    <string name="perf_opt_memory">Memory</string>
+    <string name="perf_opt_resolution">Render resolution</string>
+    <string name="perf_opt_sustained">Sustained performance</string>
+    <string name="perf_opt_selection">ការជ្រើស Java runtime</string>
+    <string name="perf_opt_preload">ដាស់ runtime ជាមុន</string>
+    <string name="perf_opt_on">បើក</string>
+    <string name="perf_opt_off">បិទ</string>
+    <string name="perf_opt_renderer_tip">ដំបូន្មាន៖ %1$s ត្រូវបានណែនាំសម្រាប់ Minecraft 1.17 ឡើងទៅលើឧបករណ៍នេះ (%2$s)។ អ្នកអាចប្តូរ renderer ក្នុងការកំណត់វីដេអូ។</string>
 </resources>

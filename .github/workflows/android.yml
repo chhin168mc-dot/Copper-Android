@@ -90,6 +90,8 @@ jobs:
         run: |
           gradle :app_mojo:assembleFullPubRelease
           mv app_mojo/build/outputs/apk/full/pubRelease/app_mojo-full-pubRelease.apk out/Nokor-release.apk
+          # Fail the release job if the generated APK is not cryptographically signed.
+          apksigner verify --verbose --print-certs out/Nokor-release.apk
       - name: Gen md5sums
         run: |
           md5sum out/app-debug-full.apk > out/app-debug-full.md5

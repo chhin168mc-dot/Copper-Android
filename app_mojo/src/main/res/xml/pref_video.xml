@@ -5,6 +5,19 @@
     <git.artdeell.mojo.prefs.BackButtonPreference />
 
     <PreferenceCategory android:title="@string/preference_category_video" >
+        <androidx.preference.SwitchPreferenceCompat
+            android:key="nokor_smart_fps_enabled"
+            android:defaultValue="false"
+            android:title="@string/nokor_smart_fps_title"
+            android:summary="@string/nokor_smart_fps_summary"
+            android:icon="@drawable/ic_px_resolution" />
+        <androidx.preference.SwitchPreferenceCompat
+            android:key="nokor_mc_auto_optimize"
+            android:defaultValue="false"
+            android:title="@string/nokor_mc_optimize_title"
+            android:summary="@string/nokor_mc_optimize_summary"
+            android:icon="@drawable/ic_px_resolution" />
+
         <androidx.preference.ListPreference
             android:title="@string/mcl_setting_category_renderer"
             android:key="renderer"

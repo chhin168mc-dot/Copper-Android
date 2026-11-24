@@ -35,7 +35,7 @@ public class PlayerPreviewView extends View {
     private static final int F_TOP = 4;    // +y
     private static final int F_BOTTOM = 5; // -y
 
-    private static final float CAPE_TILT_DEGREES = 8f;
+    private static final float CAPE_TILT_DEGREES = 10f;
     private static final float AUTO_ROTATE_DEGREES_PER_SECOND = 28f;
     private static final float MODEL_CENTER_Y = 16f;
     private static final float MODEL_FIT_HEIGHT = 36f;
@@ -62,8 +62,8 @@ public class PlayerPreviewView extends View {
     private Bitmap mCape;
     private boolean mModelDirty = true;
 
-    private float mYaw = 25f;
-    private float mPitch = 12f;
+    private float mYaw = 180f; // Show the back by default so the selected cape is immediately visible
+    private float mPitch = 8f;
     private float mLastTouchX, mLastTouchY;
     private float mDownX, mDownY;
     private boolean mDragging;
@@ -153,15 +153,17 @@ public class PlayerPreviewView extends View {
 
     private void addCape(int s) {
         Part part = new Part(true);
-        // 10x16x1 box hanging off the back of the body
-        float x = -5, y = 8, z = -3, w = 10, h = 16, d = 1;
+        // The torso's back surface is z=-2. Keep the cape fully behind it instead of
+        // sharing the same plane: coplanar faces caused the cape to look embedded in the skin.
+        // The half-unit thickness also avoids unnecessary overlap in the software renderer.
+        float x = -5, y = 8, z = -3.15f, w = 10, h = 16, d = 0.5f;
         fillFaces(part.baseFaces, x, y, z, w, h, d, 0);
         fillRects(part.baseRects, s, 0, 0, 10, 16, 1, true);
-        // Let it hang slightly away from the body, pivoting on the shoulders
-        tilt(part.baseFaces, 24f, -2f, (float) Math.toRadians(CAPE_TILT_DEGREES));
-        part.centerX = 0; part.centerY = 16; part.centerZ = -2.5f;
+        // Attach at shoulder height and let the lower edge fall away from the player's back.
+        tilt(part.baseFaces, 24f, -3.0f, (float) Math.toRadians(CAPE_TILT_DEGREES));
+        part.centerX = 0; part.centerY = 16; part.centerZ = -2.9f;
         float[] c = {part.centerX, part.centerY, part.centerZ};
-        tiltPoint(c, 24f, -2f, (float) Math.toRadians(CAPE_TILT_DEGREES));
+        tiltPoint(c, 24f, -3.0f, (float) Math.toRadians(CAPE_TILT_DEGREES));
         part.centerX = c[0]; part.centerY = c[1]; part.centerZ = c[2];
         mParts.add(part);
     }

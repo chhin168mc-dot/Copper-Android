@@ -41,6 +41,13 @@
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/perf_category">
+        <Preference
+            android:icon="@drawable/ic_px_speed"
+            android:key="perf_optimize"
+            android:persistent="false"
+            android:summary="@string/perf_optimize_summary"
+            android:title="@string/perf_optimize_title" />
+
         <androidx.preference.ListPreference
             android:defaultValue="auto"
             android:entries="@array/perf_runtime_selection_names"

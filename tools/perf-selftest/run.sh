@@ -9,7 +9,8 @@ OUT=$(mktemp -d)
 java -m jdk.compiler/com.sun.tools.javac.Main -d "$OUT" $(find "$HERE" -name "*.java") \
   "$SRC/multirt/Runtime.java" "$SRC/multirt/RuntimeSelector.java" \
   "$SRC/utils/jre/JvmArgSanitizer.java" "$SRC/utils/ContentValidator.java" \
-  "$SRC/modding/modpacks/models/ContentType.java"
+  "$SRC/modding/modpacks/models/ContentType.java" "$SRC/perf/GameOptimizer.java"
 java -cp "$OUT" git.artdeell.mojo.multirt.SelectorTest
 java -cp "$OUT" git.artdeell.mojo.utils.jre.SanTest
 java -cp "$OUT" git.artdeell.mojo.utils.CvTest
+java -cp "$OUT" git.artdeell.mojo.perf.OptimizerTest

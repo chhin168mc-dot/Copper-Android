@@ -42,6 +42,16 @@ timings switch, and a "Runtime and performance report" row.
   (local only, no personal data, size limit, last 3 files, one change at a time to compare). It measures the
   launcher side only: auth check, renderer checks, runtime pick, argument build. Time inside the game is not measured.
 
+## Optimize game (Settings > Java > Runtime and performance)
+
+One button that checks the settings against the device and shows what it would change before it
+writes anything (`perf/GameOptimizer`). It can change: memory (lowered when above 125% of the safe heap for
+the device, raised when under 75% of the recommendation, at most 2048 MB), render resolution to 75% on weak
+devices (under 3 GB RAM, under 6 cores or 32 bit), sustained performance mode on devices with 6+ cores, and the
+runtime selection / warm-up options. It never changes the renderer, the experimental options or the Java
+arguments; it only shows a renderer tip. The old values are saved, and the same button offers "Undo last
+optimization". Pressing optimize twice keeps the first backup.
+
 ## Installers
 
 The existing Modrinth/CurseForge browse, update, enable/disable and delete screens were kept. Added in
@@ -62,8 +72,8 @@ current renderer may not run it. Mods are only checked as ZIP/JAR because old Fo
 
 ## What was tested
 
-* Run: 57 checks of the selection rules, the Minecraft to Java table, the argument filter and the file
-  validator (real ZIP files), on JDK 21.
+* Run: 73 checks of the selection rules, the Minecraft to Java table, the argument filter, the file
+  validator (real ZIP files) and the optimizer (plan, apply, undo), on JDK 21.
 * Compiled with javac against the whole source tree: no error that points to a project class or method of the
   changed files. All remaining errors are Android/AndroidX/Gson/R classes that do not exist outside the SDK.
 * **Not done:** Gradle build, APK, installing, starting Minecraft, runtime warm-up timing, installer downloads,

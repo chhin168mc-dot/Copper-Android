@@ -25,6 +25,8 @@ import git.artdeell.mojo.multirt.RuntimeManager;
 import git.artdeell.mojo.multirt.RuntimeSelector;
 import git.artdeell.mojo.perf.DeviceProfile;
 import git.artdeell.mojo.perf.PerfRecorder;
+import git.artdeell.mojo.perf.MinecraftOptionsOptimizer;
+import git.artdeell.mojo.perf.SmartFpsOptimizer;
 import git.artdeell.mojo.multirt.Runtime;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.game.renderer.GameRenderer;
@@ -182,6 +184,23 @@ public class GameRunner {
                     activity.getString(R.string.boost_heap_reduced, heapMb, requestedHeap), Toast.LENGTH_LONG).show());
         }
         File gamedir = instance.getGameDirectory();
+        // Apply the player's opt-in Minecraft video profile to this instance only.
+        // The original options.txt is backed up before the first modification.
+        if (LauncherPreferences.DEFAULT_PREF != null) {
+            DeviceProfile deviceProfile = DeviceProfile.detect(activity);
+            boolean smartFpsEnabled = LauncherPreferences.DEFAULT_PREF.getBoolean(
+                    SmartFpsOptimizer.PREF_ENABLED, false);
+            if (smartFpsEnabled) {
+                SmartFpsOptimizer.applyIfEnabled(gamedir, LauncherPreferences.DEFAULT_PREF, deviceProfile);
+            } else {
+                // If Smart FPS was turned off, put back the user's original resolution and options.
+                if (SmartFpsOptimizer.hasBackup(LauncherPreferences.DEFAULT_PREF)) {
+                    MinecraftOptionsOptimizer.restore(gamedir);
+                    SmartFpsOptimizer.restore(LauncherPreferences.DEFAULT_PREF);
+                }
+                MinecraftOptionsOptimizer.applyIfEnabled(gamedir, LauncherPreferences.DEFAULT_PREF);
+            }
+        }
         JVersionList.Version versionInfo = Tools.getVersionInfo(versionId);
         // We don't need the library list, the asset index, client download info for the code below
         versionInfo.libraries = null;
