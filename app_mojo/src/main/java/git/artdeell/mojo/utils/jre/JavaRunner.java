@@ -285,6 +285,8 @@ public class JavaRunner {
         if(getCacioJavaArgs(runtimeArgs,runtime.javaVersion == 8)) hasJavaAgent = true;
         runtimeArgs.addAll(getJavaArgs(runtimeHomeDir.getAbsolutePath(), vmArgs));
         vmArgs.clear();
+        // Arguments written for another Java version make the JVM refuse to start
+        JvmArgSanitizer.sanitize(runtimeArgs, runtime.javaVersion);
         // GC and JIT flags that suit phones (skipped for everything that is already set)
         JvmTuner.addTuningArgs(runtimeArgs);
 

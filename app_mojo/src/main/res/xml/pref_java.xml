@@ -40,5 +40,38 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/perf_category">
+        <androidx.preference.ListPreference
+            android:defaultValue="auto"
+            android:entries="@array/perf_runtime_selection_names"
+            android:entryValues="@array/perf_runtime_selection_values"
+            android:icon="@drawable/ic_px_java"
+            android:key="runtimeSelection"
+            android:title="@string/perf_runtime_selection_title"
+            app2:useSimpleSummaryProvider="true" />
+
+        <SwitchPreferenceCompat
+            android:widgetLayout="@layout/preference_widget_material_switch"
+            android:defaultValue="true"
+            android:icon="@drawable/ic_px_zap"
+            android:key="runtimePreload"
+            android:summary="@string/perf_runtime_preload_summary"
+            android:title="@string/perf_runtime_preload_title" />
+
+        <SwitchPreferenceCompat
+            android:widgetLayout="@layout/preference_widget_material_switch"
+            android:defaultValue="false"
+            android:icon="@drawable/ic_px_speed"
+            android:key="perfReport"
+            android:summary="@string/perf_report_switch_summary"
+            android:title="@string/perf_report_switch_title" />
+
+        <Preference
+            android:icon="@drawable/ic_px_info"
+            android:key="perf_overview"
+            android:persistent="false"
+            android:summary="@string/perf_overview_summary"
+            android:title="@string/perf_overview_title" />
+    </PreferenceCategory>
 
 </PreferenceScreen>

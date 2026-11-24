@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="perf_category">Runtime and performance</string>
+    <string name="perf_runtime_selection_title">Java runtime selection</string>
+    <string name="perf_runtime_selection_auto">Automatic: the Java version the game asks for</string>
+    <string name="perf_runtime_selection_manual">Manual: the default runtime when it is new enough</string>
+    <string name="perf_runtime_preload_title">Warm up the runtime</string>
+    <string name="perf_runtime_preload_summary">Reads the Java runtime files into the system cache in the background before the game starts. Skipped when the free memory is low.</string>
+    <string name="perf_report_switch_title">Record launch timings</string>
+    <string name="perf_report_switch_summary">Saves how long each part of the launch takes in a file on this device. No account, chat or world names are saved, only the last 3 launches are kept.</string>
+    <string name="perf_overview_title">Runtime and performance report</string>
+    <string name="perf_overview_summary">Installed runtimes, this device and the saved launch timings</string>
+    <string name="perf_overview_device">Device</string>
+    <string name="perf_overview_runtimes">Java runtimes</string>
+    <string name="perf_overview_renderer">Renderer advice</string>
+    <string name="perf_overview_timings">Last launches</string>
+    <string name="perf_overview_no_timings">No launch was recorded. Turn on \"Record launch timings\" and start the game.</string>
+    <string name="perf_overview_clear">Delete timings</string>
+    <string name="perf_runtime_failed_hint">The runtime \"%1$s\" did not start. The next launch skips it when another installed runtime can run this version.</string>
+    <string name="content_check_failed">The downloaded file %1$s is not usable: %2$s. It was removed.</string>
+    <string name="content_check_empty">the file is empty</string>
+    <string name="content_check_not_zip">it is not a valid ZIP or JAR file</string>
+    <string name="content_check_no_pack_mcmeta">it has no pack.mcmeta, so Minecraft would not list it</string>
+    <string name="content_check_no_shaders_folder">it has no shaders folder</string>
+    <string name="content_check_hash">its checksum does not match the one of the download</string>
+    <string name="content_shader_warning_message">%1$s needs a mod that loads shader packs (Iris or OptiFine). Shader packs are heavy, and the renderer %2$s may not run them: %3$s</string>
+    <string name="content_shader_warning_gl4es">GL4ES only gives OpenGL 2.1, most shader packs need a core renderer.</string>
+    <string name="content_shader_warning_core">a core renderer is required, but not every pack works with every renderer.</string>
+    <string name="content_already_installed">%1$s is already installed.</string>
+</resources>

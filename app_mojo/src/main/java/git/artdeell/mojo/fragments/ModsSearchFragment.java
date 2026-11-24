@@ -43,6 +43,7 @@ import git.artdeell.mojo.modding.modpacks.models.ContentType;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.progresskeeper.ProgressKeeper;
 import git.artdeell.mojo.utils.profiles.VersionSelectorDialog;
+import git.artdeell.mojo.utils.ContentValidator;
 import git.artdeell.mojo.utils.DownloadUtils;
 import git.artdeell.mojo.utils.WorldUtils;
 
@@ -446,6 +447,10 @@ public class ModsSearchFragment extends Fragment implements ModItemAdapter.Searc
             }
 
             String url = modDetail.versionUrls[selectedVersion];
+            if (modDetail.versionHashes != null && selectedVersion < modDetail.versionHashes.length
+                    && modDetail.versionHashes[selectedVersion] != null) {
+                mExpectedSha1.put(url, modDetail.versionHashes[selectedVersion]);
+            }
 
             // Check if this is a CF-restricted mod using the flag set during search
             boolean isCfRestricted = modDetail.apiSource == Constants.SOURCE_CURSEFORGE
@@ -653,6 +658,71 @@ public class ModsSearchFragment extends Fragment implements ModItemAdapter.Searc
                     .show();
         }
 
+        /** SHA-1 of the version the user picked, by download URL. Kept until the download starts. */
+        private final java.util.Map<String, String> mExpectedSha1 = new java.util.concurrent.ConcurrentHashMap<>();
+
+        /**
+         * Downloads to "name.part", checks the file and only then moves it to its place, so a failed
+         * or half finished download never leaves a broken file in the mods, resource packs or shaders folder.
+         *
+         * @return the result of the check, when it failed the target was not touched
+         */
+        private ContentValidator.Result downloadChecked(String url, File target, ContentType type,
+                                                        @Nullable String sha1, String title) throws IOException {
+            File part = new File(target.getParentFile(), target.getName() + ".part");
+            try {
+                final long[] announced = {-1};
+                DownloadUtils.downloadFileMonitored(url, part, null, (current, max) -> {
+                    announced[0] = max;
+                    ProgressLayout.setProgress(ProgressLayout.INSTALL_MODPACK,
+                            max > 0 ? (int) (current * 100L / max) : 0,
+                            R.string.mcl_launch_downloading, title);
+                });
+                if (announced[0] > 0 && part.length() != announced[0]) {
+                    throw new IOException("The download of " + title + " ended early: "
+                            + part.length() + " of " + announced[0] + " bytes");
+                }
+                ContentValidator.Result result = ContentValidator.validate(part, type, sha1);
+                if (!result.ok) return result;
+                if (target.exists() && !target.delete()) {
+                    throw new IOException("Could not replace " + target.getName());
+                }
+                if (!part.renameTo(target)) {
+                    throw new IOException("Could not move " + part.getName() + " into place");
+                }
+                return result;
+            } finally {
+                if (part.exists() && !part.delete()) Log.w(TAG, "Could not delete " + part);
+            }
+        }
+
+        /** Whether a file with this checksum is already in the folder, a disabled one counts too */
+        private boolean isAlreadyInstalled(File dir, ContentType type, @Nullable String sha1,
+                                           @Nullable String oldFilePath) {
+            if (sha1 == null || sha1.length() != 40) return false;
+            File[] files = dir.listFiles();
+            if (files == null) return false;
+            for (File file : files) {
+                if (!file.isFile()) continue;
+                if (oldFilePath != null && file.getAbsolutePath().equals(oldFilePath)) continue;
+                String name = file.getName();
+                if (!name.endsWith(type.fileExtension) && !name.endsWith(type.fileExtension + ".disabled")) continue;
+                String hash = sha1Hex(file);
+                if (hash != null && hash.equalsIgnoreCase(sha1)) return true;
+            }
+            return false;
+        }
+
+        /** Shader packs need a mod that loads them and a renderer that can run them. This is what the player is told. */
+        private String shaderWarning(Context context, String fileName) {
+            boolean gl4es = git.artdeell.mojo.game.renderer.def.Renderers.GL4ES_RENDERER
+                    .equals(LauncherPreferences.PREF_RENDERER);
+            String reason = context.getString(gl4es
+                    ? R.string.content_shader_warning_gl4es : R.string.content_shader_warning_core);
+            return context.getString(R.string.content_shader_warning_message,
+                    fileName, String.valueOf(LauncherPreferences.PREF_RENDERER), reason);
+        }
+
         private void downloadMod(Context context, String url, String fileName,
                                   String[] depIds, String[] depTypes, @Nullable String oldFilePath) {
             File modsDir = getModsDir();
@@ -665,8 +735,24 @@ public class ModsSearchFragment extends Fragment implements ModItemAdapter.Searc
             ProgressLayout.setProgress(ProgressLayout.INSTALL_MODPACK, 0, R.string.global_waiting);
             MojoApplication.sExecutorService.execute(() -> {
                 try {
-                    // Download main mod
-                    DownloadUtils.downloadFile(url, targetFile);
+                    final String expectedSha1 = mExpectedSha1.remove(url);
+                    final ContentType installType = mFilters.contentType;
+
+                    // The same file is already in the folder (maybe disabled, maybe under another name)
+                    if (isAlreadyInstalled(modsDir, installType, expectedSha1, oldFilePath)) {
+                        ProgressLayout.clearProgress(ProgressLayout.INSTALL_MODPACK);
+                        Tools.runOnUiThread(() -> Toast.makeText(context,
+                                context.getString(R.string.content_already_installed, fileName),
+                                Toast.LENGTH_LONG).show());
+                        return;
+                    }
+
+                    // Download main mod, a file that fails the check never reaches the game folder
+                    ContentValidator.Result check = downloadChecked(url, targetFile, installType, expectedSha1, fileName);
+                    if (!check.ok) {
+                        throw new IOException(context.getString(R.string.content_check_failed,
+                                fileName, context.getString(check.reason)));
+                    }
 
                     // This is an update/downgrade of an already-installed mod under a
                     // different file name — remove the old jar now that the new one
@@ -692,6 +778,10 @@ public class ModsSearchFragment extends Fragment implements ModItemAdapter.Searc
                                             ? context.getString(R.string.datapack_install_success, fileName, installedInto)
                                             : context.getString(R.string.mod_install_success, fileName),
                                     Toast.LENGTH_LONG).show());
+                    if (installType == ContentType.SHADER_PACK) {
+                        Tools.runOnUiThread(() -> Toast.makeText(context, shaderWarning(context, fileName),
+                                Toast.LENGTH_LONG).show());
+                    }
                 } catch (Exception e) {
                     ProgressLayout.clearProgress(ProgressLayout.INSTALL_MODPACK);
                     Tools.showErrorRemote(context, R.string.modpack_install_download_failed, e);
@@ -740,7 +830,10 @@ public class ModsSearchFragment extends Fragment implements ModItemAdapter.Searc
                 if (targetDir == null) return;
                 if (!targetDir.exists()) targetDir.mkdirs();
 
-                DownloadUtils.downloadFile(depUrl, new File(targetDir, depName));
+                String depSha1 = depDetail.versionHashes != null && depDetail.versionHashes.length > 0
+                        ? depDetail.versionHashes[0] : null;
+                ContentValidator.Result depCheck = downloadChecked(depUrl, new File(targetDir, depName), depType, depSha1, depName);
+                if (!depCheck.ok) Log.w(TAG, "Dependency " + depName + " was not installed: it failed the file check");
             } catch (Exception e) {
                 Log.w(TAG, "Failed to download dependency " + projectId + ": " + e.getMessage());
             }

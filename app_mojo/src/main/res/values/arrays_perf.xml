@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="perf_runtime_selection_names">
+        <item>@string/perf_runtime_selection_auto</item>
+        <item>@string/perf_runtime_selection_manual</item>
+    </string-array>
+    <string-array name="perf_runtime_selection_values">
+        <item>auto</item>
+        <item>manual</item>
+    </string-array>
+</resources>

@@ -296,6 +296,8 @@ public class LauncherActivity extends BaseActivity {
         boolean launchFromShortcut = savedInstanceState == null && selectShortcutInstance(getIntent());
         setContentView(R.layout.activity_mojo_ui);
         MoJsonDownloader.prepareSubstitutionMap(getAssets());
+        // Reads the files of the runtime into the system cache while the player picks an instance
+        git.artdeell.mojo.multirt.RuntimeManager.warmUpLikely(this);
 
         try {
             Os.setenv("TMPDIR", Tools.DIR_CACHE.getAbsolutePath(), true);

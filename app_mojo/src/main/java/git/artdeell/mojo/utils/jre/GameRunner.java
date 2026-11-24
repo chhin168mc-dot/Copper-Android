@@ -21,6 +21,10 @@ import git.artdeell.mojo.instances.Instance;
 import git.artdeell.mojo.utils.DownloadUtils;
 import git.artdeell.mojo.utils.lifecycle.LifecycleAwareAlertDialog;
 import git.artdeell.mojo.multirt.MultiRTUtils;
+import git.artdeell.mojo.multirt.RuntimeManager;
+import git.artdeell.mojo.multirt.RuntimeSelector;
+import git.artdeell.mojo.perf.DeviceProfile;
+import git.artdeell.mojo.perf.PerfRecorder;
 import git.artdeell.mojo.multirt.Runtime;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.game.renderer.GameRenderer;
@@ -157,7 +161,9 @@ public class GameRunner {
 
     public static void launchGame(final AppCompatActivity activity, Account account,
                                   Instance instance, String versionId, File[] classpath, GameRenderer gameRenderer) throws Throwable {
+        PerfRecorder.begin();
         if(!performAuthPing(activity, account)) account = account.toLocal();
+        PerfRecorder.mark("auth_checked");
         git.artdeell.mojo.skins.DefaultSkins.init(activity);
 
         int freeDeviceMemory = Tools.getFreeDeviceMemory(activity);
@@ -222,10 +228,14 @@ public class GameRunner {
             if(showDialog(activity, R.string.ltw_4x_msaa_warning_msg)) return;
         }
 
-        int requiredJavaVersion = 8;
-        if(versionInfo.javaVersion != null) requiredJavaVersion = versionInfo.javaVersion.majorVersion;
+        // The JSON of the version says which Java it needs, the table is only for JSONs that do not
+        int requiredJavaVersion = versionInfo.javaVersion != null
+                ? versionInfo.javaVersion.majorVersion : RuntimeManager.javaForMinecraft(versionId);
+        PerfRecorder.mark("renderer_checked");
 
         Runtime runtime = MultiRTUtils.forceReread(pickRuntime(instance, requiredJavaVersion));
+        PerfRecorder.mark("runtime_picked");
+        RuntimeManager.warmUp(activity, runtime);
 
         // Pre-process specific files
         disableSplash(gamedir);
@@ -331,10 +341,17 @@ public class GameRunner {
 
         try {
             JavaRunner.nativeSetupExit(activity);
+            PerfRecorder.mark("args_built");
+            writePerfReport(activity, runtime, requiredJavaVersion, renderer);
             JavaRunner.startJvm(runtime, javaArgList, launchClassPath, mainClass, launchArgs);
         }catch (VMLoadException e) {
+            // The next launch uses another runtime when there is one that can run this version
+            RuntimeManager.markFailed(runtime.name);
+            final String failedRuntime = runtime.name;
             LifecycleAwareAlertDialog.DialogCreator dialogCreator = (dialog, builder) ->
-                builder.setMessage(e.toString(activity)).setPositiveButton(android.R.string.ok, (d, w)->{});
+                builder.setMessage(e.toString(activity) + "\n\n"
+                        + activity.getString(R.string.perf_runtime_failed_hint, failedRuntime))
+                        .setPositiveButton(android.R.string.ok, (d, w)->{});
 
             if(LifecycleAwareAlertDialog.haltOnDialog(activity.getLifecycle(), activity, dialogCreator)) {
                 return;
@@ -343,6 +360,23 @@ public class GameRunner {
 
         Tools.restartLauncherActivity(activity);
         Tools.fullyExit();
+    }
+
+    /** Writes the timings of this launch when the user turned the report on, it never stops the launch */
+    private static void writePerfReport(AppCompatActivity activity, Runtime runtime, int requiredJava, RenderSpec renderer) {
+        if(!PerfRecorder.isEnabled()) return;
+        try {
+            Map<String, String> settings = new java.util.LinkedHashMap<>();
+            settings.put("java_required", String.valueOf(requiredJava));
+            settings.put("java_runtime", String.valueOf(runtime.javaVersion));
+            settings.put("heap_mb", String.valueOf(JvmTuner.getHeapMb()));
+            settings.put("renderer", renderer == null ? "none" : renderer.name());
+            settings.put("runtime_selection", RuntimeManager.isAutoSelection() ? "auto" : "manual");
+            settings.put("tuning", String.valueOf(LauncherPreferences.DEFAULT_PREF.getString("javaArgs", "").contains("-Dnokor.tune=off") ? "off" : "on"));
+            PerfRecorder.finish(DeviceProfile.detect(activity), settings);
+        } catch (Throwable t) {
+            Log.w("GameRunner", "Performance report failed", t);
+        }
     }
 
     /**
@@ -524,6 +558,22 @@ public class GameRunner {
     }
 
     public static @NonNull String pickRuntime(Instance instance, int targetJavaVersion) {
+        RuntimeSelector.Resolution resolution = RuntimeManager.resolve(instance.selectedRuntime,
+                LauncherPreferences.PREF_DEFAULT_RUNTIME, targetJavaVersion, RuntimeManager.isAutoSelection());
+        if(resolution != null) {
+            Log.i("GameRunner", "Runtime " + resolution.runtime.name + " for Java " + targetJavaVersion
+                    + ": " + resolution.reason);
+            if(instance.selectedRuntime != null && !instance.selectedRuntime.equals(resolution.runtime.name)) {
+                instance.selectedRuntime = resolution.runtime.name;
+                instance.maybeWrite();
+            }
+            return resolution.runtime.name;
+        }
+        // No complete runtime is new enough, the old lookup reports the problem
+        return pickRuntimeLegacy(instance, targetJavaVersion);
+    }
+
+    private static @NonNull String pickRuntimeLegacy(Instance instance, int targetJavaVersion) {
         String runtime = Tools.getSelectedRuntime(instance);
         String profileRuntime = instance.selectedRuntime;
         Runtime pickedRuntime = MultiRTUtils.read(runtime);
