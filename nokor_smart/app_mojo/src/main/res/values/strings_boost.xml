@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="boost_heap_reduced">Low free RAM: memory limited to %1$d MB (requested %2$d MB) to keep the game stable.</string>
-</resources>
