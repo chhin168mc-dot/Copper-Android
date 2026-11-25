@@ -62,6 +62,14 @@
             android:icon="@drawable/ic_px_experiment"/>
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="Admin">
+    <Preference
+        android:key="announcement_admin"
+        android:title="Announcement Admin"
+        android:summary="Google Login and publish announcements"
+        android:icon="@drawable/ic_px_translate" />
+</PreferenceCategory>
+
     <SwitchPreferenceCompat
         android:widgetLayout="@layout/preference_widget_material_switch"
         android:title="@string/preference_force_english_title"
