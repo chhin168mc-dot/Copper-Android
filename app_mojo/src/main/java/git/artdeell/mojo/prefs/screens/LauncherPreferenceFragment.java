@@ -10,7 +10,11 @@ import git.artdeell.mojo.utils.AnimationManager;
 import git.artdeell.mojo.utils.ThemeColors;
 import android.Manifest;
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
+import android.widget.Toast;
 import android.os.Bundle;
 import android.view.View;
 
@@ -47,6 +51,30 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
         // The right pane of the two-pane settings has its own back button
         if(isSettingsListPane()) removeBackButton();
         setupNotificationRequestPreference();
+        setupAnnouncementAdminPreference();
+    }
+
+    /**
+     * Opens the announcement admin page of the backend in the browser. The page starts the Google login
+     * by itself (only the allowlisted email gets in). The external browser is used on purpose: Google
+     * blocks the login inside an embedded WebView.
+     */
+    private void setupAnnouncementAdminPreference() {
+        Preference preference = findPreference("announcement_admin");
+        if(preference == null) return;
+        preference.setOnPreferenceClickListener(p -> {
+            String base = getString(R.string.update_api_url).trim().replaceAll("/+$", "");
+            if(!base.startsWith("https://")) {
+                Toast.makeText(requireContext(), "Server URL is not set", Toast.LENGTH_LONG).show();
+                return true;
+            }
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(base + "/api/admin/announcement-ui")));
+            } catch (ActivityNotFoundException e) {
+                Toast.makeText(requireContext(), "No browser found", Toast.LENGTH_LONG).show();
+            }
+            return true;
+        });
     }
 
     /** @return whether this is the list of categories inside the left pane of the two-pane settings */
