@@ -10,11 +10,13 @@ import android.view.animation.OvershootInterpolator;
 
 import androidx.annotation.NonNull;
 
-/** Opening animation for the launcher. Timings are tuned for a slower, smoother reveal. */
+/** Opening animation for the launcher. It lasts {@link #TOTAL_MS} from the start to the end of the fade out. */
 public final class IntroAnimator {
-    private static final long FLY_IN_MS = 1400L;
-    private static final long HOLD_MS = 550L;
-    private static final long FADE_OUT_MS = 550L;
+    public static final long TOTAL_MS = 5000L;
+
+    private static final long FADE_OUT_MS = 700L;
+    private static final long FADE_START_MS = TOTAL_MS - FADE_OUT_MS;
+    private static final long WARP_MS = 3800L;
 
     private IntroAnimator() {}
 
@@ -32,20 +34,20 @@ public final class IntroAnimator {
         space.setWarp(1f);
 
         ValueAnimator warp = ValueAnimator.ofFloat(1f, 0f);
-        warp.setDuration(FLY_IN_MS + HOLD_MS);
+        warp.setDuration(WARP_MS);
         warp.setInterpolator(new DecelerateInterpolator(1.6f));
         warp.addUpdateListener(a -> space.setWarp((float) a.getAnimatedValue()));
         warp.start();
 
         logo.animate().alpha(1f).scaleX(1f).scaleY(1f)
-                .setDuration(1000L).setStartDelay(220L)
+                .setDuration(1800L).setStartDelay(400L)
                 .setInterpolator(new OvershootInterpolator(1.15f)).start();
         title.animate().alpha(1f).translationY(0f)
-                .setDuration(850L).setStartDelay(650L)
+                .setDuration(1500L).setStartDelay(1300L)
                 .setInterpolator(new DecelerateInterpolator()).start();
 
         overlay.animate().alpha(0f).scaleX(1.06f).scaleY(1.06f)
-                .setStartDelay(FLY_IN_MS + HOLD_MS + 300L)
+                .setStartDelay(FADE_START_MS)
                 .setDuration(FADE_OUT_MS)
                 .setInterpolator(new AccelerateInterpolator())
                 .setListener(new AnimatorListenerAdapter() {
