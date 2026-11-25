@@ -138,6 +138,10 @@ android {
         }
         pubRelease {
             initWith release
+            // R8 and resource shrinking broke the start of the launcher (black screen, then exit).
+            // The runtime is loaded through JNI and reflection, so this build stays unminified.
+            minifyEnabled false
+            shrinkResources false
             signingConfig hasPublicKey() ? signingConfigs.publicBuild : signingConfigs.customDebug
             matchingFallbacks += List.of("release")
         }

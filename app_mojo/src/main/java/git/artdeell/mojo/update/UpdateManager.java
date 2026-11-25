@@ -123,7 +123,8 @@ public final class UpdateManager {
                 PreferenceManager.getDefaultSharedPreferences(activity).edit()
                         .putLong(PREF_LAST_CHECK, System.currentTimeMillis()).apply();
                 onInfo(activity, info, manual);
-            } catch (Exception e) {
+            } catch (Throwable e) {
+                // The update check must never be able to close the launcher
                 Log.w(TAG, "Update check failed", e);
                 if (manual) runOnUi(activity, () ->
                         Toast.makeText(activity, R.string.update_check_failed, Toast.LENGTH_LONG).show());
