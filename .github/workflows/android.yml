@@ -137,36 +137,55 @@ jobs:
           files: |
             out/Nokor-release.apk
 
-      # The launcher reads update/latest_version_md.json to find out that a new build exists.
-      # "code" is the run number, the same number that is the versionCode of the build.
-      - name: Publish update feed
+      # The APK goes to Backblaze B2, then the Wispbyte API is told about it and stores the release in Supabase.
+      # "version_code" is the run number, the same number that is the versionCode of the build.
+      - name: Upload APK to Backblaze B2
         if: github.repository_owner == 'NokorLauncher' && github.ref == 'refs/heads/v3_openjdk'
         shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.B2_APP_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.B2_REGION }}
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          B2_ENDPOINT: ${{ secrets.B2_ENDPOINT }}
+          B2_BUCKET: ${{ secrets.B2_BUCKET }}
+        run: |
+          set -euo pipefail
+          KEY="releases/${{ github.run_number }}/Nokor-release.apk"
+          aws s3 cp out/Nokor-release.apk "s3://${B2_BUCKET}/${KEY}" \
+            --endpoint-url "${B2_ENDPOINT}" \
+            --content-type application/vnd.android.package-archive
+          echo "B2_KEY=${KEY}" >> "$GITHUB_ENV"
+
+      - name: Register release in the update API
+        if: github.repository_owner == 'NokorLauncher' && github.ref == 'refs/heads/v3_openjdk'
+        shell: bash
+        env:
+          API_URL: ${{ secrets.UPDATE_API_URL }}
+          ADMIN_TOKEN: ${{ secrets.UPDATE_ADMIN_TOKEN }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
           SIZE="$(stat -c %s out/Nokor-release.apk)"
-          URL="https://github.com/${{ github.repository }}/releases/download/nightly/Nokor-release.apk"
-          mkdir -p update
+          SHA="$(sha256sum out/Nokor-release.apk | cut -d' ' -f1)"
           jq -n \
             --argjson code "${{ github.run_number }}" \
-            --arg version "2026.1.1 (build ${{ github.run_number }})" \
-            --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --arg body "Nokor nightly build. Commit: ${{ github.sha }}" \
-            --arg uri "$URL" \
+            --arg name "2026.1.1 (build ${{ github.run_number }})" \
+            --arg key "$B2_KEY" \
             --argjson size "$SIZE" \
-            '{code: $code, version: $version, created_at: $created,
-              default_cloud_drive: null, cloud_drives: [],
-              files: [{file_name: "Nokor-release.apk", uri: $uri, size: $size, arch: "all"}],
-              default_body: {language: "NULL", markdown: $body}, bodies: []}' \
-            > update/latest_version_md.json
-          cat update/latest_version_md.json
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add update/latest_version_md.json
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Update feed for build ${{ github.run_number }}"
-          git pull --rebase origin ${{ github.ref_name }}
-          git push origin HEAD:${{ github.ref_name }}
+            --arg sha "$SHA" \
+            --arg log "${COMMIT_MSG:-Nokor nightly build}" \
+            --arg commit "${{ github.sha }}" \
+            '{version_code: $code, version_name: $name, channel: "release", arch: "all",
+              file_key: $key, file_name: "Nokor-release.apk", size_bytes: $size, sha256: $sha,
+              changelog: $log, commit_sha: $commit}' > release.json
+          cat release.json
+          curl --fail-with-body --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors \
+            --max-time 60 -X POST "${API_URL%/}/api/v1/admin/releases" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data @release.json
 
       - name: Upload onto the Google Play testing track
         continue-on-error: true

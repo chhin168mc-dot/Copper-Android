@@ -10,14 +10,11 @@ import android.view.animation.OvershootInterpolator;
 
 import androidx.annotation.NonNull;
 
-/**
- * Plays the opening animation over the launcher: the stars streak past, settle, the logo and the
- * name appear, and then the whole overlay fades away to reveal the launcher.
- */
+/** Opening animation for the launcher. Timings are tuned for a slower, smoother reveal. */
 public final class IntroAnimator {
-    private static final long FLY_IN_MS = 1000L;
-    private static final long HOLD_MS = 350L;
-    private static final long FADE_OUT_MS = 380L;
+    private static final long FLY_IN_MS = 1400L;
+    private static final long HOLD_MS = 550L;
+    private static final long FADE_OUT_MS = 550L;
 
     private IntroAnimator() {}
 
@@ -41,14 +38,14 @@ public final class IntroAnimator {
         warp.start();
 
         logo.animate().alpha(1f).scaleX(1f).scaleY(1f)
-                .setDuration(750L).setStartDelay(150L)
-                .setInterpolator(new OvershootInterpolator(1.2f)).start();
+                .setDuration(1000L).setStartDelay(220L)
+                .setInterpolator(new OvershootInterpolator(1.15f)).start();
         title.animate().alpha(1f).translationY(0f)
-                .setDuration(600L).setStartDelay(450L)
+                .setDuration(850L).setStartDelay(650L)
                 .setInterpolator(new DecelerateInterpolator()).start();
 
         overlay.animate().alpha(0f).scaleX(1.06f).scaleY(1.06f)
-                .setStartDelay(FLY_IN_MS + HOLD_MS + 250L)
+                .setStartDelay(FLY_IN_MS + HOLD_MS + 300L)
                 .setDuration(FADE_OUT_MS)
                 .setInterpolator(new AccelerateInterpolator())
                 .setListener(new AnimatorListenerAdapter() {

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Address of update/latest_version_md.json of your repository (raw file). The update check is off while it holds YOUR_ . Change the repository name if it is not NokorLauncher -->
-    <string name="update_feed_url" translatable="false">https://raw.githubusercontent.com/NokorLauncher/NokorLauncher/v3_openjdk/update/latest_version_md.json</string>
+    <!-- Public https address of the update API (Wispbyte), no trailing slash. The update check is off while it holds YOUR_ -->
+    <string name="update_api_url" translatable="false">https://YOUR_APP.wispbyte.app</string>
 
     <string name="preference_update_auto_title">Check for updates automatically</string>
     <string name="preference_update_auto_description">Looks for a new version when the launcher starts. On Wi-Fi the update is downloaded in the background.</string>
@@ -22,6 +22,19 @@
     <string name="update_download_failed">Could not download the update</string>
     <string name="update_install_failed">Could not start the installer</string>
     <string name="update_allow_install">Allow this app to install apps, then press the update button again</string>
-    <string name="update_not_configured">The address of the update feed is not set</string>
+    <string name="update_not_configured">The address of the update server is not set</string>
     <string name="update_store_build">This version is updated by the store</string>
+
+    <string name="update_label_installed">Installed version</string>
+    <string name="update_label_new">New version</string>
+    <string name="update_label_size">Size</string>
+    <string name="update_size_value">%1$.1f MB</string>
+    <string name="update_whats_new">What\'s new</string>
+    <string name="update_mandatory_note">This update is required to keep using the launcher</string>
+    <string name="update_progress_amount">%1$.1f / %2$.1f MB</string>
+    <string name="update_progress_unknown">%1$.1f MB</string>
+    <string name="update_progress_speed">%1$.1f MB/s</string>
+    <string name="update_download_complete">Download complete</string>
+    <string name="update_download_corrupt">The downloaded file is damaged, try again</string>
+    <string name="update_action_retry">Try again</string>
 </resources>

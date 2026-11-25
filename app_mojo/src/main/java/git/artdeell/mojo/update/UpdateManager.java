@@ -9,31 +9,28 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
-import android.view.ViewGroup;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.FileProvider;
 import androidx.preference.PreferenceManager;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import git.artdeell.mojo.BuildConfig;
@@ -41,10 +38,11 @@ import git.artdeell.mojo.MojoApplication;
 import git.artdeell.mojo.R;
 
 /**
- * Checks the update feed (update/latest_version_md.json), downloads the new APK and starts the install.
+ * Asks the update API (Node.js on Wispbyte, data in Supabase, APK in Backblaze B2) if a newer build exists,
+ * downloads the APK and starts the install.
  *
  * Android does not let an app install itself without a confirmation of the user, so "auto update"
- * means: the feed is checked at the start of the launcher, the APK is downloaded in the background
+ * means: the API is asked at the start of the launcher, the APK is downloaded in the background
  * when the device is on an unmetered network, and the user only has to confirm the install.
  */
 public final class UpdateManager {
@@ -52,24 +50,37 @@ public final class UpdateManager {
 
     public static final String PREF_AUTO_CHECK = "autoUpdateCheck";
     private static final String PREF_LAST_CHECK = "updateLastCheck";
-    private static final String PREF_SKIPPED_CODE = "updateSkippedCode";
+    static final String PREF_SKIPPED_CODE = "updateSkippedCode";
     private static final String PREF_PENDING_CODE = "updatePendingCode";
+    private static final String PREF_READY_CODE = "updateReadyCode";
 
     private static final long CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L;
-    private static final int TIMEOUT_MS = 15000;
+    private static final int CONNECT_TIMEOUT_MS = 20000;
+    private static final int READ_TIMEOUT_MS = 20000;
     private static final String APK_NAME = "Nokor-update.apk";
 
     private static final AtomicBoolean sBusy = new AtomicBoolean(false);
 
     private UpdateManager() {}
 
-    /** What the feed says about the newest version */
-    private static final class Info {
+    /** What the API says about the newest version */
+    static final class Info {
         long code;
         String version = "";
         String notes = "";
         String uri;
+        String sha256 = "";
         long size;
+        boolean mandatory;
+    }
+
+    /** The downloaded file does not match the checksum from the API */
+    static final class ChecksumException extends IOException {
+        ChecksumException() { super("Checksum mismatch"); }
+    }
+
+    interface ProgressCallback {
+        void onProgress(long done, long total, long bytesPerSecond);
     }
 
     /** Called when the launcher starts. Checks only when the user allows it, and not more than every few hours. */
@@ -98,8 +109,8 @@ public final class UpdateManager {
     }
 
     private static void check(@NonNull Activity activity, boolean manual) {
-        String feedUrl = activity.getString(R.string.update_feed_url).trim();
-        if (feedUrl.isEmpty() || feedUrl.contains("YOUR_")) {
+        String apiUrl = activity.getString(R.string.update_api_url).trim();
+        if (apiUrl.isEmpty() || apiUrl.contains("YOUR_")) {
             if (manual) Toast.makeText(activity, R.string.update_not_configured, Toast.LENGTH_LONG).show();
             return;
         }
@@ -108,7 +119,7 @@ public final class UpdateManager {
 
         MojoApplication.sExecutorService.execute(() -> {
             try {
-                Info info = fetchInfo(feedUrl);
+                Info info = fetchInfo(apiUrl);
                 PreferenceManager.getDefaultSharedPreferences(activity).edit()
                         .putLong(PREF_LAST_CHECK, System.currentTimeMillis()).apply();
                 onInfo(activity, info, manual);
@@ -129,89 +140,148 @@ public final class UpdateManager {
             return;
         }
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
-        if (!manual && prefs.getLong(PREF_SKIPPED_CODE, -1L) == info.code) return;
+        if (!manual && !info.mandatory && prefs.getLong(PREF_SKIPPED_CODE, -1L) == info.code) return;
 
         File apk = apkFile(activity);
-        boolean ready = isDownloaded(apk, info);
+        boolean ready = isDownloaded(activity, apk, info);
         // On Wi-Fi the file is fetched quietly, so the only thing left to do is to confirm the install
         if (!ready && !manual && !isMetered(activity)) {
             ready = downloadQuietly(activity, info, apk);
         }
         final boolean readyFinal = ready;
-        runOnUi(activity, () -> showUpdateDialog(activity, info, readyFinal, manual));
+        runOnUi(activity, () -> UpdateDialog.show(activity, info, readyFinal, manual));
     }
 
-    private static void showUpdateDialog(Activity activity, Info info, boolean ready, boolean manual) {
-        if (activity.isFinishing() || activity.isDestroyed()) return;
-        StringBuilder message = new StringBuilder();
-        message.append(activity.getString(R.string.update_message_versions, info.version, BuildConfig.VERSION_NAME));
-        if (info.size > 0) {
-            message.append('\n').append(activity.getString(R.string.update_message_size, info.size / (1024f * 1024f)));
-        }
-        if (!info.notes.isEmpty()) message.append("\n\n").append(info.notes);
+    // ---- API and download ----
 
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(activity)
-                .setTitle(R.string.update_available_title)
-                .setMessage(message.toString())
-                .setPositiveButton(ready ? R.string.update_action_install : R.string.update_action_download,
-                        (d, w) -> startUpdate(activity, info, ready))
-                .setNegativeButton(R.string.update_action_later, null);
-        if (!manual) {
-            builder.setNeutralButton(R.string.update_action_skip, (d, w) ->
-                    PreferenceManager.getDefaultSharedPreferences(activity).edit()
-                            .putLong(PREF_SKIPPED_CODE, info.code).apply());
+    @Nullable
+    private static Info fetchInfo(String apiUrl) throws Exception {
+        if (!apiUrl.startsWith("https://")) throw new IOException("The update API must use https");
+        String base = apiUrl.replaceAll("/+$", "");
+        String abi = Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "";
+        String url = base + "/api/v1/update/check?versionCode=" + BuildConfig.VERSION_CODE
+                + "&abi=" + URLEncoder.encode(abi, "UTF-8") + "&channel=release";
+
+        HttpURLConnection connection = open(url);
+        try {
+            if (connection.getResponseCode() != 200) throw new IOException("HTTP " + connection.getResponseCode());
+            String body = org.apache.commons.io.IOUtils.toString(connection.getInputStream(), StandardCharsets.UTF_8);
+            return parseInfo(body, base);
+        } finally {
+            connection.disconnect();
         }
-        builder.show();
     }
 
-    private static void startUpdate(Activity activity, Info info, boolean ready) {
-        File apk = apkFile(activity);
-        if (ready) {
-            install(activity, info, apk);
-            return;
-        }
-        // The dialog with a progress bar, the download runs in the background
-        ProgressBar bar = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
-        bar.setMax(100);
-        bar.setIndeterminate(info.size <= 0);
-        TextView text = new TextView(activity);
-        text.setText(R.string.update_downloading);
-        LinearLayout layout = new LinearLayout(activity);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        int pad = (int) (24 * activity.getResources().getDisplayMetrics().density);
-        layout.setPadding(pad, pad / 2, pad, 0);
-        layout.addView(text, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        layout.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    private static HttpURLConnection open(String url) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+        connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        connection.setReadTimeout(READ_TIMEOUT_MS);
+        connection.setUseCaches(false);
+        connection.setRequestProperty("User-Agent", "NokorLauncher/" + BuildConfig.VERSION_NAME);
+        return connection;
+    }
 
-        AtomicBoolean cancelled = new AtomicBoolean(false);
-        AlertDialog dialog = new MaterialAlertDialogBuilder(activity)
-                .setTitle(R.string.update_available_title)
-                .setView(layout)
-                .setCancelable(false)
-                .setNegativeButton(android.R.string.cancel, (d, w) -> cancelled.set(true))
-                .show();
+    @SuppressWarnings("deprecation")
+    @Nullable
+    private static Info parseInfo(String json, String base) {
+        JsonObject root = new JsonParser().parse(json).getAsJsonObject();
+        if (!root.has("update_available") || !root.get("update_available").getAsBoolean()) return null;
+        if (!root.has("latest") || !root.get("latest").isJsonObject()) return null;
+        JsonObject latest = root.getAsJsonObject("latest");
 
-        MojoApplication.sExecutorService.execute(() -> {
-            boolean ok;
-            try {
-                ok = download(activity, info, apk, cancelled, percent -> runOnUi(activity, () -> {
-                    bar.setIndeterminate(false);
-                    bar.setProgress(percent);
-                }));
-            } catch (Exception e) {
-                Log.w(TAG, "Update download failed", e);
-                ok = false;
+        Info info = new Info();
+        info.code = longOf(latest, "version_code", 0L);
+        info.version = stringOf(latest, "version_name");
+        info.notes = stringOf(latest, "changelog").trim();
+        info.sha256 = stringOf(latest, "sha256").toLowerCase(Locale.ROOT);
+        info.size = longOf(latest, "size", 0L);
+        info.mandatory = root.has("mandatory") && root.get("mandatory").getAsBoolean();
+
+        String uri = stringOf(latest, "download_url");
+        if (uri.startsWith("/")) uri = base + uri;
+        // Only https, a plain http link could be swapped on the way
+        info.uri = uri.startsWith("https://") ? uri : null;
+        return info;
+    }
+
+    private static String stringOf(JsonObject object, String key) {
+        JsonElement element = object.get(key);
+        return element == null || element.isJsonNull() ? "" : element.getAsString();
+    }
+
+    private static long longOf(JsonObject object, String key, long fallback) {
+        JsonElement element = object.get(key);
+        return element == null || element.isJsonNull() ? fallback : element.getAsLong();
+    }
+
+    /** Downloads the APK into the cache. Returns false when the user cancelled. */
+    static boolean download(Context context, Info info, File target, AtomicBoolean cancelled,
+                            @Nullable ProgressCallback callback) throws Exception {
+        File dir = target.getParentFile();
+        if (dir != null && !dir.isDirectory() && !dir.mkdirs()) throw new IOException("No cache folder");
+        File part = new File(target.getPath() + ".part");
+        PreferenceManager.getDefaultSharedPreferences(context).edit().remove(PREF_READY_CODE).apply();
+
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        HttpURLConnection connection = open(info.uri);
+        try {
+            // The API answers with a redirect to a fresh signed Backblaze link, the connection follows it
+            if (connection.getResponseCode() != 200) throw new IOException("HTTP " + connection.getResponseCode());
+            long total = connection.getContentLength() > 0 ? connection.getContentLength() : info.size;
+            long done = 0;
+            long startedAt = System.nanoTime();
+            long lastReport = 0L;
+            try (InputStream in = connection.getInputStream(); OutputStream out = new FileOutputStream(part)) {
+                byte[] buffer = new byte[64 * 1024];
+                int read;
+                while ((read = in.read(buffer)) != -1) {
+                    if (cancelled.get()) {
+                        //noinspection ResultOfMethodCallIgnored
+                        part.delete();
+                        return false;
+                    }
+                    out.write(buffer, 0, read);
+                    digest.update(buffer, 0, read);
+                    done += read;
+                    long now = System.nanoTime();
+                    if (callback != null && now - lastReport > 200_000_000L) {
+                        lastReport = now;
+                        double seconds = Math.max((now - startedAt) / 1e9, 0.001);
+                        callback.onProgress(done, total, (long) (done / seconds));
+                    }
+                }
             }
-            final boolean success = ok;
-            runOnUi(activity, () -> {
-                if (!activity.isFinishing() && !activity.isDestroyed()) dialog.dismiss();
-                if (success) install(activity, info, apk);
-                else if (!cancelled.get()) Toast.makeText(activity, R.string.update_download_failed, Toast.LENGTH_LONG).show();
-            });
-        });
+            if (info.size > 0 && part.length() != info.size) {
+                //noinspection ResultOfMethodCallIgnored
+                part.delete();
+                throw new IOException("Wrong size of the file: " + part.length());
+            }
+            if (!info.sha256.isEmpty() && !toHex(digest.digest()).equals(info.sha256)) {
+                //noinspection ResultOfMethodCallIgnored
+                part.delete();
+                throw new ChecksumException();
+            }
+            //noinspection ResultOfMethodCallIgnored
+            target.delete();
+            if (!part.renameTo(target)) throw new IOException("Could not move the file");
+            PreferenceManager.getDefaultSharedPreferences(context).edit().putLong(PREF_READY_CODE, info.code).apply();
+            if (callback != null) callback.onProgress(done, total, 0L);
+            return true;
+        } finally {
+            connection.disconnect();
+        }
     }
 
-    private static void install(Activity activity, Info info, File apk) {
+    private static boolean downloadQuietly(Context context, Info info, File target) {
+        try {
+            return download(context, info, target, new AtomicBoolean(false), null);
+        } catch (Exception e) {
+            Log.w(TAG, "Quiet download of the update failed", e);
+            return false;
+        }
+    }
+
+    static void install(Activity activity, Info info, File apk) {
         if (!apk.isFile()) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !activity.getPackageManager().canRequestPackageInstalls()) {
             // The file stays here, the next press of the button installs it without downloading again
@@ -233,131 +303,16 @@ public final class UpdateManager {
         }
     }
 
-    // ---- feed and download ----
-
-    @Nullable
-    private static Info fetchInfo(String feedUrl) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(feedUrl).openConnection();
-        connection.setConnectTimeout(TIMEOUT_MS);
-        connection.setReadTimeout(TIMEOUT_MS);
-        connection.setUseCaches(false);
-        connection.setRequestProperty("User-Agent", "NokorLauncher/" + BuildConfig.VERSION_NAME);
-        try {
-            if (connection.getResponseCode() != 200) throw new java.io.IOException("HTTP " + connection.getResponseCode());
-            String body = org.apache.commons.io.IOUtils.toString(connection.getInputStream(), StandardCharsets.UTF_8);
-            return parseInfo(body);
-        } finally {
-            connection.disconnect();
-        }
-    }
-
-    @SuppressWarnings("deprecation")
-    @Nullable
-    private static Info parseInfo(String json) {
-        JsonObject root = new JsonParser().parse(json).getAsJsonObject();
-        if (!root.has("code")) return null;
-        Info info = new Info();
-        info.code = root.get("code").getAsLong();
-        if (root.has("version") && !root.get("version").isJsonNull()) info.version = root.get("version").getAsString();
-        if (root.has("default_body") && root.get("default_body").isJsonObject()) {
-            JsonObject body = root.getAsJsonObject("default_body");
-            if (body.has("markdown") && !body.get("markdown").isJsonNull()) info.notes = body.get("markdown").getAsString().trim();
-        }
-        if (root.has("files") && root.get("files").isJsonArray()) {
-            JsonObject chosen = chooseFile(root.getAsJsonArray("files"));
-            if (chosen != null) {
-                if (chosen.has("uri")) info.uri = chosen.get("uri").getAsString();
-                if (chosen.has("size") && !chosen.get("size").isJsonNull()) info.size = chosen.get("size").getAsLong();
-            }
-        }
-        return info;
-    }
-
-    /** Takes the file of the architecture of the device, or the universal one */
-    @Nullable
-    private static JsonObject chooseFile(JsonArray files) {
-        String abi = Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "";
-        String wanted = abi.equals("arm64-v8a") ? "arm64" : abi.equals("armeabi-v7a") ? "arm" : "all";
-        JsonObject universal = null, first = null;
-        for (JsonElement element : files) {
-            if (!element.isJsonObject()) continue;
-            JsonObject file = element.getAsJsonObject();
-            if (!file.has("uri")) continue;
-            if (first == null) first = file;
-            String arch = file.has("arch") ? file.get("arch").getAsString() : "all";
-            if (arch.equals(wanted)) return file;
-            if (arch.equals("all")) universal = file;
-        }
-        return universal != null ? universal : first;
-    }
-
-    private interface ProgressCallback { void onProgress(int percent); }
-
-    private static boolean download(Context context, Info info, File target, AtomicBoolean cancelled,
-                                    @Nullable ProgressCallback callback) throws Exception {
-        File dir = target.getParentFile();
-        if (dir != null && !dir.isDirectory() && !dir.mkdirs()) throw new java.io.IOException("No cache folder");
-        File part = new File(target.getPath() + ".part");
-        HttpURLConnection connection = (HttpURLConnection) new URL(info.uri).openConnection();
-        connection.setConnectTimeout(TIMEOUT_MS);
-        connection.setReadTimeout(TIMEOUT_MS);
-        connection.setRequestProperty("User-Agent", "NokorLauncher/" + BuildConfig.VERSION_NAME);
-        try {
-            if (connection.getResponseCode() != 200) throw new java.io.IOException("HTTP " + connection.getResponseCode());
-            long total = connection.getContentLength() > 0 ? connection.getContentLength() : info.size;
-            long done = 0;
-            int lastPercent = -1;
-            try (InputStream in = connection.getInputStream(); OutputStream out = new FileOutputStream(part)) {
-                byte[] buffer = new byte[64 * 1024];
-                int read;
-                while ((read = in.read(buffer)) != -1) {
-                    if (cancelled.get()) {
-                        //noinspection ResultOfMethodCallIgnored
-                        part.delete();
-                        return false;
-                    }
-                    out.write(buffer, 0, read);
-                    done += read;
-                    if (callback != null && total > 0) {
-                        int percent = (int) (done * 100 / total);
-                        if (percent != lastPercent) {
-                            lastPercent = percent;
-                            callback.onProgress(percent);
-                        }
-                    }
-                }
-            }
-            if (info.size > 0 && part.length() != info.size) {
-                //noinspection ResultOfMethodCallIgnored
-                part.delete();
-                throw new java.io.IOException("Wrong size of the file: " + part.length());
-            }
-            //noinspection ResultOfMethodCallIgnored
-            target.delete();
-            if (!part.renameTo(target)) throw new java.io.IOException("Could not move the file");
-            return true;
-        } finally {
-            connection.disconnect();
-        }
-    }
-
-    private static boolean downloadQuietly(Context context, Info info, File target) {
-        try {
-            return download(context, info, target, new AtomicBoolean(false), null);
-        } catch (Exception e) {
-            Log.w(TAG, "Quiet download of the update failed", e);
-            return false;
-        }
-    }
-
     // ---- small helpers ----
 
-    private static File apkFile(Context context) {
+    static File apkFile(Context context) {
         return new File(new File(context.getCacheDir(), "updates"), APK_NAME);
     }
 
-    private static boolean isDownloaded(File apk, Info info) {
-        return apk.isFile() && info.size > 0 && apk.length() == info.size;
+    /** The file is whole and it was checked against the checksum when it was downloaded */
+    private static boolean isDownloaded(Context context, File apk, Info info) {
+        if (!apk.isFile() || info.size <= 0 || apk.length() != info.size) return false;
+        return PreferenceManager.getDefaultSharedPreferences(context).getLong(PREF_READY_CODE, -1L) == info.code;
     }
 
     private static boolean isMetered(Context context) {
@@ -371,10 +326,16 @@ public final class UpdateManager {
         if (pending < 0 || BuildConfig.VERSION_CODE < pending) return;
         //noinspection ResultOfMethodCallIgnored
         apkFile(context).delete();
-        prefs.edit().remove(PREF_PENDING_CODE).apply();
+        prefs.edit().remove(PREF_PENDING_CODE).remove(PREF_READY_CODE).apply();
     }
 
-    private static void runOnUi(Activity activity, Runnable runnable) {
+    private static String toHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) sb.append(String.format(Locale.ROOT, "%02x", b));
+        return sb.toString();
+    }
+
+    static void runOnUi(Activity activity, Runnable runnable) {
         activity.runOnUiThread(runnable);
     }
 }

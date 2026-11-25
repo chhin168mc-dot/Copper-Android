@@ -19,6 +19,19 @@
     <string name="update_download_failed">មិនអាចទាញយកការអាប់ដេតបានទេ</string>
     <string name="update_install_failed">មិនអាចបើកកម្មវិធីដំឡើងបានទេ</string>
     <string name="update_allow_install">អនុញ្ញាតឲ្យកម្មវិធីនេះដំឡើង app រួចចុចប៊ូតុងអាប់ដេតម្តងទៀត</string>
-    <string name="update_not_configured">មិនទាន់កំណត់អាសយដ្ឋាន update feed ទេ</string>
+    <string name="update_not_configured">មិនទាន់កំណត់អាសយដ្ឋានម៉ាស៊ីនបម្រើអាប់ដេតទេ</string>
     <string name="update_store_build">កំណែនេះអាប់ដេតតាមរយៈ store</string>
+
+    <string name="update_label_installed">កំណែដែលបានដំឡើង</string>
+    <string name="update_label_new">កំណែថ្មី</string>
+    <string name="update_label_size">ទំហំ</string>
+    <string name="update_size_value">%1$.1f MB</string>
+    <string name="update_whats_new">អ្វីដែលថ្មី</string>
+    <string name="update_mandatory_note">ត្រូវអាប់ដេតកំណែនេះ ទើបអាចបន្តប្រើ launcher បាន</string>
+    <string name="update_progress_amount">%1$.1f / %2$.1f MB</string>
+    <string name="update_progress_unknown">%1$.1f MB</string>
+    <string name="update_progress_speed">%1$.1f MB/s</string>
+    <string name="update_download_complete">ទាញយករួចរាល់</string>
+    <string name="update_download_corrupt">ឯកសារដែលទាញយកខូច សូមព្យាយាមម្តងទៀត</string>
+    <string name="update_action_retry">ព្យាយាមម្តងទៀត</string>
 </resources>
