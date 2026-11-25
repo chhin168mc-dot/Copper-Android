@@ -65,7 +65,7 @@ final class UpdateDialog {
         mLater = view.findViewById(R.id.update_later);
         mSkip = view.findViewById(R.id.update_skip);
 
-        ((TextView) view.findViewById(R.id.update_current_version)).setText(BuildConfig.VERSION_NAME);
+        ((TextView) view.findViewById(R.id.update_current_version)).setText(BuildConfig.VERSION_NAME + " (build " + BuildConfig.VERSION_CODE + ")");
         ((TextView) view.findViewById(R.id.update_new_version)).setText(mInfo.version);
         if (mInfo.size > 0) {
             ((TextView) view.findViewById(R.id.update_size)).setText(

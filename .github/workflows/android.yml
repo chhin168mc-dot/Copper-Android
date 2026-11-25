@@ -55,7 +55,7 @@ jobs:
         run: mkdir out
       # Release APKs are built on every branch of the main repo (not for pull requests, they don't get secrets)
       - name: Decode release keystore
-        if: github.repository_owner == 'NokorLauncher' && github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request'
         run: |
           if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app_mojo/mojo_release_next.jks
@@ -63,14 +63,14 @@ jobs:
 
       # The Google Play upload key is only needed where the .aab is published
       - name: Decode upload keystore
-        if: github.repository_owner == 'NokorLauncher' && (github.ref == 'refs/heads/v3_openjdk' || startsWith(github.ref, 'refs/tags/v'))
+        if: vars.PUBLISH_GPLAY == 'true' && github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
         run: |
           if [ -n "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > app_mojo/mojo_upload_next.jks
           fi
 
       - name: Build Publishing .aab
-        if: github.repository_owner == 'NokorLauncher' && (github.ref == 'refs/heads/v3_openjdk' || startsWith(github.ref, 'refs/tags/v'))
+        if: vars.PUBLISH_GPLAY == 'true' && github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
         run: |
           gradle :app_mojo:bundleFullGplay
           mv app_mojo/build/outputs/bundle/fullGplay/app_mojo-full-gplay.aab out/app-gplay.aab
@@ -86,12 +86,13 @@ jobs:
           gradle :app_mojo:assembleNoruntimeDebug
           mv app_mojo/build/outputs/apk/noruntime/debug/app_mojo-noruntime-debug.apk out/app-debug-noruntime.apk
       - name: Build Release .apk
-        if: github.repository_owner == 'NokorLauncher' && github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request'
         run: |
           gradle :app_mojo:assembleFullPubRelease
           mv app_mojo/build/outputs/apk/full/pubRelease/app_mojo-full-pubRelease.apk out/Nokor-release.apk
           # Fail the release job if the generated APK is not cryptographically signed.
-          apksigner verify --verbose --print-certs out/Nokor-release.apk
+          APKSIGNER="$(ls "${ANDROID_HOME:-$ANDROID_SDK_ROOT}"/build-tools/*/apksigner | sort -V | tail -1)"
+          "$APKSIGNER" verify --verbose --print-certs out/Nokor-release.apk
       - name: Gen md5sums
         run: |
           md5sum out/app-debug-full.apk > out/app-debug-full.md5
@@ -110,22 +111,22 @@ jobs:
           path: out/app-debug-noruntime.apk
 
       - name: Upload Release APK
-        if: github.repository_owner == 'NokorLauncher' && github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: out/Nokor-release.apk
 
       - name: Upload AAB
-        if: github.repository_owner == 'NokorLauncher' && (github.ref == 'refs/heads/v3_openjdk' || startsWith(github.ref, 'refs/tags/v'))
+        if: vars.PUBLISH_GPLAY == 'true' && github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
           path: out/app-gplay.aab
 
-      # Only v3_openjdk publishes the nightly release, other branches just upload the APK as an artifact
+      # Only the default branch (or a v* tag) publishes the nightly release, other branches just upload the APK as an artifact
       - name: Release Nightly APK
-        if: github.repository_owner == 'NokorLauncher' && github.ref == 'refs/heads/v3_openjdk'
+        if: github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
         uses: softprops/action-gh-release@v3
         with:
           name: Nokor Nightly Builds
@@ -140,7 +141,7 @@ jobs:
       # The APK goes to Backblaze B2, then the Wispbyte API is told about it and stores the release in Supabase.
       # "version_code" is the run number, the same number that is the versionCode of the build.
       - name: Upload APK to Backblaze B2
-        if: github.repository_owner == 'NokorLauncher' && github.ref == 'refs/heads/v3_openjdk'
+        if: github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
         shell: bash
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.B2_KEY_ID }}
@@ -159,7 +160,7 @@ jobs:
           echo "B2_KEY=${KEY}" >> "$GITHUB_ENV"
 
       - name: Register release in the update API
-        if: github.repository_owner == 'NokorLauncher' && github.ref == 'refs/heads/v3_openjdk'
+        if: github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
         shell: bash
         env:
           API_URL: ${{ secrets.UPDATE_API_URL }}
@@ -189,7 +190,7 @@ jobs:
 
       - name: Upload onto the Google Play testing track
         continue-on-error: true
-        if: github.repository_owner == 'NokorLauncher' && github.ref == 'refs/heads/v3_openjdk'
+        if: vars.PUBLISH_GPLAY == 'true' && github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
         uses: r0adkll/upload-google-play@v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.SERVICE_JSON }}

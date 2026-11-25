@@ -21,6 +21,13 @@ def getVersionName = {
     return "2026.1.1"
 }
 
+// Without the release keystore password the release build is signed with the fixed debug key,
+// so the APK still installs and updates over the previous build.
+def hasPublicKey = {
+    String pass = System.getenv("MOJOPUB_KEYSTORE_PASSWORD")
+    return pass != null && !pass.isEmpty()
+}
+
 def getCFApiKey = {
     String key = System.getenv("CURSEFORGE_API_KEY")
     if(key != null) return key
@@ -131,7 +138,7 @@ android {
         }
         pubRelease {
             initWith release
-            signingConfig signingConfigs.publicBuild
+            signingConfig hasPublicKey() ? signingConfigs.publicBuild : signingConfigs.customDebug
             matchingFallbacks += List.of("release")
         }
     }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Public https address of the update API (Wispbyte), no trailing slash. The update check is off while it holds YOUR_ -->
-    <string name="update_api_url" translatable="false">https://YOUR_APP.wispbyte.app</string>
+    <!-- Public https address of the update API (Wispbyte / freesrv), no trailing slash. The update check is off while it holds YOUR_ -->
+    <string name="update_api_url" translatable="false">https://nokorlauncher.freesrv.com</string>
 
     <string name="preference_update_auto_title">Check for updates automatically</string>
     <string name="preference_update_auto_description">Looks for a new version when the launcher starts. On Wi-Fi the update is downloaded in the background.</string>
