@@ -166,7 +166,9 @@ final class UpdateDialog {
                 mAmount.setText(mActivity.getString(R.string.update_progress_unknown, done / MB));
             }
             if (bytesPerSecond > 0) {
-                mSpeed.setText(mActivity.getString(R.string.update_progress_speed, bytesPerSecond / MB));
+                mSpeed.setText(bytesPerSecond >= MB
+                        ? mActivity.getString(R.string.update_progress_speed, bytesPerSecond / MB)
+                        : mActivity.getString(R.string.update_progress_speed_kb, bytesPerSecond / 1024f));
             }
         });
     }

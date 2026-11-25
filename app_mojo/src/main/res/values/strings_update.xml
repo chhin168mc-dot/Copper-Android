@@ -3,8 +3,8 @@
     <!-- Public https address of the update API (Wispbyte / freesrv), no trailing slash. The update check is off while it holds YOUR_ -->
     <string name="update_api_url" translatable="false">https://nokorlauncher.freesrv.com</string>
 
-    <string name="preference_update_auto_title">Check for updates automatically</string>
-    <string name="preference_update_auto_description">Looks for a new version when the launcher starts. On Wi-Fi the update is downloaded in the background.</string>
+    <string name="preference_update_auto_title">Auto Update Notice</string>
+    <string name="preference_update_auto_description">Automatically displays an update notice when a new launcher version is available.</string>
     <string name="preference_update_now_title">Check for updates</string>
     <string name="preference_update_now_description">Current version: %1$s</string>
 
@@ -34,6 +34,7 @@
     <string name="update_progress_amount">%1$.1f / %2$.1f MB</string>
     <string name="update_progress_unknown">%1$.1f MB</string>
     <string name="update_progress_speed">%1$.1f MB/s</string>
+    <string name="update_progress_speed_kb">%1$.0f KB/s</string>
     <string name="update_download_complete">Download complete</string>
     <string name="update_download_corrupt">The downloaded file is damaged, try again</string>
     <string name="update_action_retry">Try again</string>

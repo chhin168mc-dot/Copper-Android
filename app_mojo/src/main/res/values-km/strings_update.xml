@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="preference_update_auto_title">ពិនិត្យការអាប់ដេតដោយស្វ័យប្រវត្តិ</string>
-    <string name="preference_update_auto_description">រកមើលកំណែថ្មីពេលបើក launcher ។ ពេលប្រើ Wi-Fi ការអាប់ដេតនឹងត្រូវទាញយកនៅផ្ទៃខាងក្រោយ ។</string>
+    <string name="preference_update_auto_title">Auto Update Notice</string>
+    <string name="preference_update_auto_description">បង្ហាញការជូនដំណឹងភ្លាមៗ នៅពេលមានកំណែ Launcher ថ្មី។</string>
     <string name="preference_update_now_title">ពិនិត្យការអាប់ដេត</string>
     <string name="preference_update_now_description">កំណែបច្ចុប្បន្ន៖ %1$s</string>
 
@@ -31,6 +31,7 @@
     <string name="update_progress_amount">%1$.1f / %2$.1f MB</string>
     <string name="update_progress_unknown">%1$.1f MB</string>
     <string name="update_progress_speed">%1$.1f MB/s</string>
+    <string name="update_progress_speed_kb">%1$.0f KB/s</string>
     <string name="update_download_complete">ទាញយករួចរាល់</string>
     <string name="update_download_corrupt">ឯកសារដែលទាញយកខូច សូមព្យាយាមម្តងទៀត</string>
     <string name="update_action_retry">ព្យាយាមម្តងទៀត</string>

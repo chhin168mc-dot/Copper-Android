@@ -54,7 +54,6 @@ public final class UpdateManager {
     private static final String PREF_PENDING_CODE = "updatePendingCode";
     private static final String PREF_READY_CODE = "updateReadyCode";
 
-    private static final long CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L;
     private static final int CONNECT_TIMEOUT_MS = 20000;
     private static final int READ_TIMEOUT_MS = 20000;
     private static final String APK_NAME = "Nokor-update.apk";
@@ -89,8 +88,7 @@ public final class UpdateManager {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
         cleanupInstalled(activity, prefs);
         if (!prefs.getBoolean(PREF_AUTO_CHECK, true)) return;
-        long now = System.currentTimeMillis();
-        if (now - prefs.getLong(PREF_LAST_CHECK, 0L) < CHECK_INTERVAL_MS) return;
+        // Check on every launcher startup so a newly published version is noticed promptly.
         check(activity, false);
     }
 
