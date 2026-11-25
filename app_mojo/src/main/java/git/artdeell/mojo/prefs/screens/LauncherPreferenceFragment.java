@@ -9,6 +9,8 @@ import android.content.pm.ActivityInfo;
 import git.artdeell.mojo.utils.AnimationManager;
 import git.artdeell.mojo.utils.ThemeColors;
 import android.Manifest;
+import android.content.Intent;
+import android.net.Uri;
 import android.app.Activity;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -47,6 +49,11 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
         // The right pane of the two-pane settings has its own back button
         if(isSettingsListPane()) removeBackButton();
         setupNotificationRequestPreference();
+        Preference admin = findPreference("announcement_admin");
+        if (admin != null) admin.setOnPreferenceClickListener(p -> {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://nokorlauncher.freesrv.com/api/auth/google")));
+            return true;
+        });
     }
 
     /** @return whether this is the list of categories inside the left pane of the two-pane settings */

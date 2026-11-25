@@ -21,6 +21,18 @@ import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.text.util.Linkify;
+import android.text.method.LinkMovementMethod;
+import android.content.SharedPreferences;
+import androidx.preference.PreferenceManager;
+import androidx.constraintlayout.widget.ConstraintLayout;
+import org.json.JSONObject;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
@@ -566,6 +578,7 @@ public class MainMenuFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        loadAnnouncementBanner(view);
         // Quick Actions
         Button mNewsButton = view.findViewById(R.id.news_button);
         Button mDiscordButton = view.findViewById(R.id.social_media_button);
@@ -641,6 +654,42 @@ public class MainMenuFragment extends Fragment {
     }
 
     /** A button of the menu: the menu closes, then the action runs */
+    private void loadAnnouncementBanner(View root) {
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                conn = (HttpURLConnection) new URL("https://nokorlauncher.freesrv.com/api/announcement").openConnection();
+                conn.setConnectTimeout(5000); conn.setReadTimeout(5000); conn.setRequestMethod("GET");
+                if (conn.getResponseCode() != 200) return;
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                StringBuilder sb = new StringBuilder(); String line;
+                while ((line = reader.readLine()) != null) sb.append(line); reader.close();
+                JSONObject data = new JSONObject(sb.toString());
+                String content = data.optString("content", "");
+                String stamp = data.optString("updated_at", data.optString("published_at", ""));
+                if (content.trim().isEmpty()) return;
+                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(requireContext());
+                if (stamp.equals(prefs.getString("announcement_dismissed", ""))) return;
+                requireActivity().runOnUiThread(() -> showAnnouncementBanner(root, content, stamp));
+            } catch (Exception ignored) { } finally { if (conn != null) conn.disconnect(); }
+        }).start();
+    }
+
+    private void showAnnouncementBanner(View root, String content, String stamp) {
+        if (!(root instanceof ConstraintLayout) || !isAdded()) return;
+        ConstraintLayout layout = (ConstraintLayout) root;
+        LinearLayout card = new LinearLayout(requireContext()); card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setPadding(16, 12, 10, 12); card.setBackgroundColor(0xEE263238); card.setElevation(8f);
+        TextView message = new TextView(requireContext()); message.setText(content); message.setTextColor(Color.WHITE); message.setTextSize(14);
+        message.setLinksClickable(true); Linkify.addLinks(message, Linkify.WEB_URLS); message.setMovementMethod(LinkMovementMethod.getInstance()); message.setPadding(0,0,10,0);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f); card.addView(message, textParams);
+        TextView close = new TextView(requireContext()); close.setText("×"); close.setTextColor(Color.WHITE); close.setTextSize(24); close.setGravity(android.view.Gravity.CENTER); close.setPadding(8,0,8,0); card.addView(close);
+        card.setId(View.generateViewId());
+        ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID; lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID; lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID; lp.setMargins(12,12,12,0);
+        layout.addView(card, lp); close.setOnClickListener(v -> { PreferenceManager.getDefaultSharedPreferences(requireContext()).edit().putString("announcement_dismissed", stamp).apply(); layout.removeView(card); });
+    }
+
     private void bindMenuAction(@Nullable View button, @NonNull Runnable action) {
         if (button == null) return;
         button.setOnClickListener(v -> {
