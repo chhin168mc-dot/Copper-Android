@@ -3,7 +3,6 @@ package git.artdeell.mojo.skins;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -17,14 +16,17 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.Arrays;
 import java.util.List;
 
 /**
  * A small software 3D renderer that shows a Minecraft player with a skin and (optionally) a cape.
  * Every body part is a textured box, drawn with an orthographic camera that can be rotated
  * by dragging. It auto-rotates while idle.
+ *
+ * Every face is rasterized into a frame buffer with a depth buffer, so what is in front is decided
+ * per pixel. Sorting whole parts by their center (what this view did before) made the cape show
+ * through the skin, and the skin through the cape, from some angles.
  */
 public class PlayerPreviewView extends View {
     // Face order used everywhere in this class
@@ -35,7 +37,10 @@ public class PlayerPreviewView extends View {
     private static final int F_TOP = 4;    // +y
     private static final int F_BOTTOM = 5; // -y
 
-    private static final float CAPE_TILT_DEGREES = 10f;
+    /** The cape hangs almost straight down, only the lower edge swings a little away from the back */
+    private static final float CAPE_TILT_DEGREES = 3f;
+    private static final float RENDER_PIXELS_PER_UNIT = 8f;
+    private static final float EDGE_EPSILON = 1e-3f;
     private static final float AUTO_ROTATE_DEGREES_PER_SECOND = 28f;
     private static final float MODEL_CENTER_Y = 16f;
     private static final float MODEL_FIT_HEIGHT = 36f;
@@ -49,13 +54,10 @@ public class PlayerPreviewView extends View {
         final Rect[] baseRects = new Rect[6];
         final Rect[] overlayRects = new Rect[6];
         boolean hasOverlay;
-        float centerX, centerY, centerZ;
-        float depth;
         Part(boolean cape) { this.cape = cape; }
     }
 
     private final List<Part> mParts = new ArrayList<>();
-    private final Comparator<Part> mDepthOrder = (a, b) -> Float.compare(a.depth, b.depth);
 
     private Bitmap mSkin;
     private boolean mSlim;
@@ -70,11 +72,20 @@ public class PlayerPreviewView extends View {
     private long mLastFrameTime;
 
     private final Paint mPaint = new Paint();
-    private final Matrix mMatrix = new Matrix();
     private final RectF mDst = new RectF();
-    private final float[] mSrcPoints = new float[6];
-    private final float[] mDstPoints = new float[6];
     private final float[] mView = new float[12];
+
+    // Textures as plain pixels, read once per model rebuild
+    private int[] mSkinPixels;
+    private int mSkinWidth;
+    private int[] mCapePixels;
+    private int mCapeWidth;
+
+    // Frame buffer: the colors, the depth of every pixel (bigger = closer to the camera) and the bitmap shown
+    private Bitmap mFrame;
+    private int[] mColors;
+    private float[] mDepths;
+    private int mFrameWidth, mFrameHeight;
 
     public PlayerPreviewView(Context context) {
         super(context);
@@ -124,7 +135,17 @@ public class PlayerPreviewView extends View {
     private void rebuildModel() {
         mModelDirty = false;
         mParts.clear();
+        mSkinPixels = null;
+        mCapePixels = null;
         if (mSkin == null) return;
+        mSkinWidth = mSkin.getWidth();
+        mSkinPixels = new int[mSkinWidth * mSkin.getHeight()];
+        mSkin.getPixels(mSkinPixels, 0, mSkinWidth, 0, 0, mSkinWidth, mSkin.getHeight());
+        if (mCape != null) {
+            mCapeWidth = mCape.getWidth();
+            mCapePixels = new int[mCapeWidth * mCape.getHeight()];
+            mCape.getPixels(mCapePixels, 0, mCapeWidth, 0, 0, mCapeWidth, mCape.getHeight());
+        }
         int s = mSkin.getWidth() / 64;
         float armWidth = mSlim ? 3 : 4;
 
@@ -147,24 +168,20 @@ public class PlayerPreviewView extends View {
         part.hasOverlay = true;
         fillFaces(part.overlayFaces, x, y, z, w, h, d, inflate);
         fillRects(part.overlayRects, s, ou, ov, (int) w, (int) h, (int) d, false);
-        part.centerX = x + w / 2; part.centerY = y + h / 2; part.centerZ = z + d / 2;
         mParts.add(part);
     }
 
     private void addCape(int s) {
         Part part = new Part(true);
-        // The torso's back surface is z=-2. Keep the cape fully behind it instead of
-        // sharing the same plane: coplanar faces caused the cape to look embedded in the skin.
-        // The half-unit thickness also avoids unnecessary overlap in the software renderer.
-        float x = -5, y = 8, z = -3.15f, w = 10, h = 16, d = 0.5f;
+        // The outer layer of the torso, arms and legs ends at z=-2.25 (their back is z=-2, plus 0.25).
+        // The cape starts 0.03 behind it, so it is close to the skin and still not inside it.
+        // Its top stays at y=23.4, just under the outer layer of the head (y=23.5), for the same reason.
+        // The lower edge only swings backwards, away from the body, so the two never cross.
+        float x = -5, y = 7.4f, z = -2.78f, w = 10, h = 16, d = 0.5f;
         fillFaces(part.baseFaces, x, y, z, w, h, d, 0);
         fillRects(part.baseRects, s, 0, 0, 10, 16, 1, true);
-        // Attach at shoulder height and let the lower edge fall away from the player's back.
-        tilt(part.baseFaces, 24f, -3.0f, (float) Math.toRadians(CAPE_TILT_DEGREES));
-        part.centerX = 0; part.centerY = 16; part.centerZ = -2.9f;
-        float[] c = {part.centerX, part.centerY, part.centerZ};
-        tiltPoint(c, 24f, -3.0f, (float) Math.toRadians(CAPE_TILT_DEGREES));
-        part.centerX = c[0]; part.centerY = c[1]; part.centerZ = c[2];
+        // The cape hangs from the top of its inner surface (the surface that touches the back)
+        tilt(part.baseFaces, y + h, z + d, (float) Math.toRadians(CAPE_TILT_DEGREES));
         mParts.add(part);
     }
 
@@ -234,7 +251,7 @@ public class PlayerPreviewView extends View {
     protected void onDraw(@NonNull Canvas canvas) {
         super.onDraw(canvas);
         if (mModelDirty) rebuildModel();
-        if (mSkin == null || mParts.isEmpty()) return;
+        if (mSkin == null || mSkinPixels == null || mParts.isEmpty() || getWidth() <= 0 || getHeight() <= 0) return;
 
         long now = SystemClock.uptimeMillis();
         if (mLastFrameTime != 0 && !mDragging) {
@@ -249,31 +266,58 @@ public class PlayerPreviewView extends View {
         float cp = (float) Math.cos(pitchRad), sp = (float) Math.sin(pitchRad);
 
         float scale = Math.min(getWidth() / MODEL_FIT_WIDTH, getHeight() / MODEL_FIT_HEIGHT);
-        float originX = getWidth() / 2f;
-        float originY = getHeight() / 2f;
+        // The frame buffer is drawn at a whole number of screen pixels per buffer pixel,
+        // so the texture pixels stay crisp and the work per frame stays small
+        int factor = Math.max(1, Math.round(scale / RENDER_PIXELS_PER_UNIT));
+        prepareFrame((getWidth() + factor - 1) / factor, (getHeight() + factor - 1) / factor);
+        Arrays.fill(mColors, 0);
+        Arrays.fill(mDepths, -Float.MAX_VALUE);
 
-        // Far parts first
-        for (Part part : mParts) {
-            part.depth = transformZ(part.centerX, part.centerY, part.centerZ, cy, sy, cp, sp);
-        }
-        Collections.sort(mParts, mDepthOrder);
+        float bufferScale = scale / factor;
+        // The frame buffer can be a little larger than the view (when the size is not a multiple of
+        // the factor): the player is centered on the view, not on the buffer
+        float originX = getWidth() / 2f / factor;
+        float originY = getHeight() / 2f / factor;
 
         for (Part part : mParts) {
-            Bitmap texture = part.cape ? mCape : mSkin;
-            drawFaces(canvas, texture, part.baseFaces, part.baseRects, cy, sy, cp, sp, scale, originX, originY);
+            int[] pixels = part.cape ? mCapePixels : mSkinPixels;
+            int textureWidth = part.cape ? mCapeWidth : mSkinWidth;
+            if (pixels == null) continue;
+            drawFaces(pixels, textureWidth, part.baseFaces, part.baseRects, cy, sy, cp, sp, bufferScale, originX, originY);
             if (part.hasOverlay) {
-                drawFaces(canvas, texture, part.overlayFaces, part.overlayRects, cy, sy, cp, sp, scale, originX, originY);
+                drawFaces(pixels, textureWidth, part.overlayFaces, part.overlayRects, cy, sy, cp, sp, bufferScale, originX, originY);
             }
         }
+
+        mFrame.setPixels(mColors, 0, mFrameWidth, 0, 0, mFrameWidth, mFrameHeight);
+        mDst.set(0, 0, mFrameWidth * factor, mFrameHeight * factor);
+        canvas.drawBitmap(mFrame, null, mDst, mPaint);
         postInvalidateOnAnimation();
     }
 
-    private static float transformZ(float x, float y, float z, float cy, float sy, float cp, float sp) {
-        float z1 = -x * sy + z * cy;
-        return (y - MODEL_CENTER_Y) * sp + z1 * cp;
+    /** Makes the frame buffer the wanted size, it is reused from frame to frame */
+    private void prepareFrame(int width, int height) {
+        if (mFrame != null && mFrameWidth == width && mFrameHeight == height) return;
+        if (mFrame != null) mFrame.recycle();
+        mFrameWidth = width;
+        mFrameHeight = height;
+        mFrame = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        mColors = new int[width * height];
+        mDepths = new float[width * height];
     }
 
-    /** Projects model space to screen space; result in out[0..2] = screenX, screenY, depth */
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (mFrame != null) {
+            mFrame.recycle();
+            mFrame = null;
+            mFrameWidth = 0;
+            mFrameHeight = 0;
+        }
+    }
+
+    /** Projects model space to screen space; result in out[offset..offset+2] = screenX, screenY, depth (bigger = closer) */
     private static void project(float x, float y, float z, float cy, float sy, float cp, float sp,
                                 float scale, float originX, float originY, float[] out, int offset) {
         float y0 = y - MODEL_CENTER_Y;
@@ -286,7 +330,7 @@ public class PlayerPreviewView extends View {
         out[offset + 2] = z2;
     }
 
-    private void drawFaces(Canvas canvas, Bitmap texture, float[][] faces, Rect[] rects,
+    private void drawFaces(int[] texture, int textureWidth, float[][] faces, Rect[] rects,
                            float cy, float sy, float cp, float sp,
                            float scale, float originX, float originY) {
         for (int f = 0; f < 6; f++) {
@@ -295,28 +339,74 @@ public class PlayerPreviewView extends View {
                 project(c[i * 3], c[i * 3 + 1], c[i * 3 + 2], cy, sy, cp, sp,
                         scale, originX, originY, mView, i * 3);
             }
-            // Back-face culling: normal = down x right, visible when it points to the camera (+z)
-            float rx = mView[3] - mView[0], ry = mView[4] - mView[1];
-            float dx = mView[6] - mView[0], dy = mView[7] - mView[1];
-            // Screen y points down, so the sign of the 2D cross product tells the facing
-            float facing = rx * dy - ry * dx;
-            if (facing <= 0.5f) continue;
+            rasterizeFace(texture, textureWidth, rects[f]);
+        }
+    }
 
-            Rect src = rects[f];
-            float sw = src.width(), sh = src.height();
-            mSrcPoints[0] = 0;  mSrcPoints[1] = 0;
-            mSrcPoints[2] = sw; mSrcPoints[3] = 0;
-            mSrcPoints[4] = 0;  mSrcPoints[5] = sh;
-            mDstPoints[0] = mView[0]; mDstPoints[1] = mView[1];
-            mDstPoints[2] = mView[3]; mDstPoints[3] = mView[4];
-            mDstPoints[4] = mView[6]; mDstPoints[5] = mView[7];
-            if (!mMatrix.setPolyToPoly(mSrcPoints, 0, mDstPoints, 0, 3)) continue;
+    /**
+     * Draws the face whose projected corners (top-left, top-right, bottom-left, bottom-right) are in mView.
+     * With an orthographic camera a rectangle is always a parallelogram on the screen, so the texture
+     * position and the depth of a pixel follow from two coordinates (a, b) along its two edges.
+     */
+    private void rasterizeFace(int[] texture, int textureWidth, Rect src) {
+        final float[] v = mView;
+        float p0x = v[0], p0y = v[1];
+        float e1x = v[3] - p0x, e1y = v[4] - p0y; // top-left -> top-right
+        float e2x = v[6] - p0x, e2y = v[7] - p0y; // top-left -> bottom-left
+        float det = e1x * e2y - e1y * e2x;
+        // Back-face culling: the sign tells whether the outside of the face points to the camera
+        if (det <= 0.05f) return;
+        float invDet = 1f / det;
 
-            mDst.set(0, 0, sw, sh);
-            canvas.save();
-            canvas.concat(mMatrix);
-            canvas.drawBitmap(texture, src, mDst, mPaint);
-            canvas.restore();
+        float minX = Math.min(Math.min(v[0], v[3]), Math.min(v[6], v[9]));
+        float maxX = Math.max(Math.max(v[0], v[3]), Math.max(v[6], v[9]));
+        float minY = Math.min(Math.min(v[1], v[4]), Math.min(v[7], v[10]));
+        float maxY = Math.max(Math.max(v[1], v[4]), Math.max(v[7], v[10]));
+        int x0 = Math.max(0, (int) Math.floor(minX));
+        int x1 = Math.min(mFrameWidth - 1, (int) Math.ceil(maxX));
+        int y0 = Math.max(0, (int) Math.floor(minY));
+        int y1 = Math.min(mFrameHeight - 1, (int) Math.ceil(maxY));
+
+        float z0 = v[2];
+        float dz1 = v[5] - z0; // depth change along the first edge
+        float dz2 = v[8] - z0; // depth change along the second edge
+        int sw = src.width(), sh = src.height();
+        final float maxFraction = 0.999999f;
+
+        for (int y = y0; y <= y1; y++) {
+            float py = y + 0.5f - p0y;
+            int row = y * mFrameWidth;
+            for (int x = x0; x <= x1; x++) {
+                float px = x + 0.5f - p0x;
+                float a = (px * e2y - py * e2x) * invDet;
+                float b = (e1x * py - e1y * px) * invDet;
+                if (a < -EDGE_EPSILON || a >= 1f + EDGE_EPSILON || b < -EDGE_EPSILON || b >= 1f + EDGE_EPSILON) continue;
+                int index = row + x;
+                float depth = z0 + a * dz1 + b * dz2;
+                if (depth <= mDepths[index]) continue;
+
+                if (a < 0f) a = 0f; else if (a > maxFraction) a = maxFraction;
+                if (b < 0f) b = 0f; else if (b > maxFraction) b = maxFraction;
+                int color = texture[(src.top + (int) (b * sh)) * textureWidth + src.left + (int) (a * sw)];
+                int alpha = color >>> 24;
+                if (alpha == 0) continue; // transparent texels (outer layers) show what is behind them
+                if (alpha == 255) {
+                    mColors[index] = color;
+                    mDepths[index] = depth;
+                } else {
+                    int behind = mColors[index];
+                    if ((behind >>> 24) == 0) {
+                        mColors[index] = color;
+                    } else {
+                        // A semi-transparent texel is mixed with what is already there (it writes no depth)
+                        int inv = 255 - alpha;
+                        int r = (((color >> 16) & 0xFF) * alpha + ((behind >> 16) & 0xFF) * inv) / 255;
+                        int g = (((color >> 8) & 0xFF) * alpha + ((behind >> 8) & 0xFF) * inv) / 255;
+                        int bl = ((color & 0xFF) * alpha + (behind & 0xFF) * inv) / 255;
+                        mColors[index] = 0xFF000000 | (r << 16) | (g << 8) | bl;
+                    }
+                }
+            }
         }
     }
 
