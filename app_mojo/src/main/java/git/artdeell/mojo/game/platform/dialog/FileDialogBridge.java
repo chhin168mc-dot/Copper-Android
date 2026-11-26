@@ -213,7 +213,23 @@ public class FileDialogBridge {
 
     public static void beep() {
         try {
-            ToneGenerator toneGenerator = new ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 100);
+            Activity host = getHostActivity();
+            if (host != null) {
+                if (!git.artdeell.mojo.utils.SoundSettings.isEnabled(host)) return;
+                int level = Math.round(100 * git.artdeell.mojo.utils.SoundSettings.volume(host));
+                if (level <= 0) return;
+                beepAt(level);
+                return;
+            }
+            beepAt(100);
+        } catch (Throwable t) {
+            Log.w(TAG, "Beep failed", t);
+        }
+    }
+
+    private static void beepAt(int level) {
+        try {
+            ToneGenerator toneGenerator = new ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, level);
             toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 150);
             toneGenerator.release();
         } catch (Throwable t) {

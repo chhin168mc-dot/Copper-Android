@@ -32,6 +32,7 @@ public final class ClickSounds {
     private static int sClickId;
     private static volatile boolean sLoaded;
     private static boolean sStartupPlayed;
+    private static long sLastNotifyMs;
 
     private ClickSounds() {}
 
@@ -113,6 +114,36 @@ public final class ClickSounds {
         float volume = SoundSettings.volume(context);
         if (volume <= 0f) return;
         sPool.play(sClickId, volume, volume, 1, 0, 1f);
+    }
+
+    /**
+     * The notification sound at the volume of the sound slider. The notifications themselves are silent,
+     * because Android plays a channel's sound at the phone's volume and the app can't turn that down.
+     */
+    public static void playNotification(Context context) {
+        if (!SoundSettings.isEnabled(context)) return;
+        float volume = SoundSettings.volume(context);
+        if (volume <= 0f) return;
+        long now = android.os.SystemClock.elapsedRealtime();
+        synchronized (ClickSounds.class) {
+            if (now - sLastNotifyMs < 2000L) return;
+            sLastNotifyMs = now;
+        }
+        try {
+            MediaPlayer player = MediaPlayer.create(context.getApplicationContext(), R.raw.nokor_notify,
+                    new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build(),
+                    android.media.AudioManager.AUDIO_SESSION_ID_GENERATE);
+            if (player == null) return;
+            player.setVolume(volume, volume);
+            player.setOnCompletionListener(MediaPlayer::release);
+            player.setOnErrorListener((mp, what, extra) -> { mp.release(); return true; });
+            player.start();
+        } catch (RuntimeException ignored) {
+            // A missing sound must never stop a notification
+        }
     }
 
     /** The chime heard once, when the launcher's screen first shows up after the app starts */

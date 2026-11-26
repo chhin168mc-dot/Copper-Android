@@ -201,16 +201,14 @@ public final class Tools {
         CTRLDEF_FILE = DIR_GAME_HOME + "/controlmap/default.json";
     }
 
-    /** The Nokor notification sound, or null when the user has turned the sounds off */
+    /** Always null: the notifications are silent and the app plays the sound itself, see ClickSounds.playNotification */
     public static android.net.Uri notificationSoundUri(Context context) {
-        if (!git.artdeell.mojo.utils.SoundSettings.isEnabled(context)) return null;
-        return android.net.Uri.parse("android.resource://" + context.getPackageName() + "/" + R.raw.nokor_notify);
+        return null;
     }
 
-    /** A channel's sound can't change once it exists, so the sounds switch picks between two channels */
+    /** Android plays a channel's sound at the phone's volume, so the notifications use the channel without sound */
     public static String notificationChannelId(Context context) {
-        return context.getString(git.artdeell.mojo.utils.SoundSettings.isEnabled(context)
-                ? R.string.notif_channel_id : R.string.notif_channel_silent_id);
+        return context.getString(R.string.notif_channel_silent_id);
     }
 
     public static void buildNotificationChannel(Context context){

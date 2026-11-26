@@ -567,7 +567,7 @@
     <string name="preference_sounds_enabled_title">Sounds</string>
     <string name="preference_sounds_enabled_summary">Startup chime, button clicks and notification sound</string>
     <string name="preference_sounds_volume_title">Sound volume</string>
-    <string name="preference_sounds_volume_summary">Volume of the startup chime and button clicks. Notification volume follows the phone\'s notification volume.</string>
+    <string name="preference_sounds_volume_summary">Volume of the startup chime, button clicks and notification sound.</string>
     <string name="preference_category_animations">Animations</string>
     <string name="preference_category_background">Background</string>
     <string name="preference_set_custom_bg_title">Set custom background</string>

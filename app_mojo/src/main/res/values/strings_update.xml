@@ -38,4 +38,7 @@
     <string name="update_download_complete">Download complete</string>
     <string name="update_download_corrupt">The downloaded file is damaged, try again</string>
     <string name="update_action_retry">Try again</string>
+    <string name="update_waiting_internet">No internet. Waiting, the download goes on by itself…</string>
+    <string name="update_download_no_space">Not enough free space. Free some space and press Try again</string>
+    <string name="update_size_delta">%1$.1f MB (only %2$.1f MB is downloaded)</string>
 </resources>

@@ -35,4 +35,7 @@
     <string name="update_download_complete">ទាញយករួចរាល់</string>
     <string name="update_download_corrupt">ឯកសារដែលទាញយកខូច សូមព្យាយាមម្តងទៀត</string>
     <string name="update_action_retry">ព្យាយាមម្តងទៀត</string>
+    <string name="update_waiting_internet">គ្មានអ៊ីនធឺណិត កំពុងរង់ចាំ… នឹងទាញយកបន្តដោយស្វ័យប្រវត្តិ</string>
+    <string name="update_download_no_space">ទំហំផ្ទុកមិនគ្រប់គ្រាន់ សូមសម្អាតទំហំ រួចចុចព្យាយាមម្តងទៀត</string>
+    <string name="update_size_delta">%1$.1f MB (ទាញយកតែ %2$.1f MB)</string>
 </resources>

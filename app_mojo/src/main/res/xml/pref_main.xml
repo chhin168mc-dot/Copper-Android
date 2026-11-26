@@ -67,7 +67,7 @@
             android:key="announcement_admin"
             android:title="Announcement Admin"
             android:summary="Google Login and publish announcements"
-            android:icon="@drawable/ic_px_translate" />
+            android:icon="@drawable/ic_px_announcement" />
     </PreferenceCategory>
 
     <SwitchPreferenceCompat

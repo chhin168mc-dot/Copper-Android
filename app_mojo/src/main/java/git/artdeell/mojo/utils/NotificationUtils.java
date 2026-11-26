@@ -38,5 +38,6 @@ public class NotificationUtils {
         notificationBuilder.setSound(git.artdeell.mojo.Tools.notificationSoundUri(context));
 
         notificationManager.notify(notificationId, notificationBuilder.build());
+        ClickSounds.playNotification(context);
     }
 }

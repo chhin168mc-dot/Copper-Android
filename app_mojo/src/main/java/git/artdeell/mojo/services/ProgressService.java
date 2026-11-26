@@ -74,7 +74,10 @@ public class ProgressService extends Service implements TaskCountListener {
             startForeground(NotificationUtils.NOTIFICATION_ID_PROGRESS_SERVICE, notification);
         }
         if(ProgressKeeper.getTaskCount() < 1) stopSelf();
-        else ProgressKeeper.addTaskCountListener(this, false);
+        else {
+            git.artdeell.mojo.utils.ClickSounds.playNotification(this);
+            ProgressKeeper.addTaskCountListener(this, false);
+        }
 
         return START_NOT_STICKY;
     }

@@ -185,6 +185,64 @@ jobs:
             -H "Content-Type: application/json" \
             --data @release.json
 
+      # The update files: only what changed between this build and the last builds, so the launcher downloads
+      # a few MB instead of the whole APK. A failure here never stops the release, the apps then download the
+      # whole APK as before.
+      - name: Build and register the update files (only the changed parts)
+        continue-on-error: true
+        if: github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.B2_APP_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.B2_REGION }}
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          B2_ENDPOINT: ${{ secrets.B2_ENDPOINT }}
+          B2_BUCKET: ${{ secrets.B2_BUCKET }}
+          API_URL: ${{ secrets.UPDATE_API_URL }}
+          ADMIN_TOKEN: ${{ secrets.UPDATE_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          CODE="${{ github.run_number }}"
+          # The last 3 builds before this one, so apps that skipped a build get an update file too
+          PREVIOUS="$(curl --fail --silent --show-error --max-time 60 "${API_URL%/}/api/v1/admin/releases" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            | jq -r --argjson code "$CODE" \
+                '[.[] | select(.channel == "release" and .is_active and (.version_code | tonumber) < $code)]
+                 | sort_by(.version_code | tonumber) | reverse | .[0:3] | .[].version_code')"
+          if [ -z "$PREVIOUS" ]; then echo "No earlier build, nothing to compare with"; exit 0; fi
+          NEW_SIZE="$(stat -c %s out/Nokor-release.apk)"
+          for FROM in $PREVIOUS; do
+            echo "=== from build $FROM ==="
+            # The APK of the earlier build is in B2 under the key of the upload step
+            if ! aws s3 cp "s3://${B2_BUCKET}/releases/${FROM}/Nokor-release.apk" prev.apk \
+                 --endpoint-url "${B2_ENDPOINT}" --only-show-errors; then
+              echo "The APK of build $FROM is not in B2, skipped"; continue
+            fi
+            python3 tools/make_delta.py prev.apk out/Nokor-release.apk "out/from-${FROM}.delta" --meta delta.json
+            rm -f prev.apk
+            if [ "$(jq -r .worth_it delta.json)" != "true" ]; then
+              echo "The update file is not much smaller than the APK, skipped"; continue
+            fi
+            KEY="releases/${CODE}/from-${FROM}.delta"
+            aws s3 cp "out/from-${FROM}.delta" "s3://${B2_BUCKET}/${KEY}" \
+              --endpoint-url "${B2_ENDPOINT}" --content-type application/octet-stream
+            jq -n \
+              --argjson code "$CODE" --argjson from "$FROM" --arg key "$KEY" --arg name "from-${FROM}.delta" \
+              --slurpfile meta delta.json \
+              '{version_code: $code, from_code: $from, channel: "release", arch: "all",
+                file_key: $key, file_name: $name,
+                size_bytes: $meta[0].delta_size, sha256: $meta[0].delta_sha256,
+                base_sha256: $meta[0].base_sha256, base_size: $meta[0].base_size}' > delta-request.json
+            curl --fail-with-body --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors \
+              --max-time 60 -X POST "${API_URL%/}/api/v1/admin/deltas" \
+              -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data @delta-request.json
+            echo
+          done
+
       - name: Upload onto the Google Play testing track
         continue-on-error: true
         if: vars.PUBLISH_GPLAY == 'true' && github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))

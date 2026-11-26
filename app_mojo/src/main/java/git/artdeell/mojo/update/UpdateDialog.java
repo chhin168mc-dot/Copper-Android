@@ -31,6 +31,9 @@ final class UpdateDialog {
     private final UpdateManager.Info mInfo;
     private final File mApk;
 
+    private static AlertDialog sCurrent;
+    private static Activity sCurrentActivity;
+
     private AlertDialog mDialog;
     private View mProgressGroup;
     private TextView mStatus, mAmount, mSpeed;
@@ -40,6 +43,7 @@ final class UpdateDialog {
     private boolean mReady;
     private boolean mCanSkip;
     private boolean mDownloading;
+    private volatile boolean mWaiting;
     private AtomicBoolean mCancelled = new AtomicBoolean(false);
 
     private UpdateDialog(Activity activity, UpdateManager.Info info, boolean ready) {
@@ -51,6 +55,9 @@ final class UpdateDialog {
 
     static void show(Activity activity, UpdateManager.Info info, boolean ready, boolean manual) {
         if (activity.isFinishing() || activity.isDestroyed()) return;
+        // One window is enough, the startup and a manual check must not stack two of them
+        if (sCurrent != null && sCurrent.isShowing() && sCurrentActivity != null
+                && !sCurrentActivity.isFinishing() && !sCurrentActivity.isDestroyed()) return;
         new UpdateDialog(activity, info, ready).build(manual);
     }
 
@@ -68,8 +75,10 @@ final class UpdateDialog {
         ((TextView) view.findViewById(R.id.update_current_version)).setText(BuildConfig.VERSION_NAME + " (build " + BuildConfig.VERSION_CODE + ")");
         ((TextView) view.findViewById(R.id.update_new_version)).setText(mInfo.version);
         if (mInfo.size > 0) {
-            ((TextView) view.findViewById(R.id.update_size)).setText(
-                    mActivity.getString(R.string.update_size_value, mInfo.size / MB));
+            // With an update file only what changed is downloaded, the window tells how much
+            ((TextView) view.findViewById(R.id.update_size)).setText(mInfo.delta != null && !mReady
+                    ? mActivity.getString(R.string.update_size_delta, mInfo.size / MB, mInfo.delta.size / MB)
+                    : mActivity.getString(R.string.update_size_value, mInfo.size / MB));
         } else {
             view.findViewById(R.id.update_size_row).setVisibility(View.GONE);
         }
@@ -86,8 +95,14 @@ final class UpdateDialog {
                 .setView(view)
                 .setCancelable(!mInfo.mandatory)
                 .create();
-        // Leaving the window in the middle of the download stops it
-        mDialog.setOnDismissListener(d -> mCancelled.set(true));
+        // Leaving the window in the middle of the download stops it, the part that is there stays for the next time
+        mDialog.setOnDismissListener(d -> {
+            mCancelled.set(true);
+            if (sCurrent == mDialog) {
+                sCurrent = null;
+                sCurrentActivity = null;
+            }
+        });
 
         mPrimary.setOnClickListener(v -> {
             if (mReady) UpdateManager.install(mActivity, mInfo, mApk);
@@ -104,6 +119,8 @@ final class UpdateDialog {
         });
 
         showAvailableState();
+        sCurrent = mDialog;
+        sCurrentActivity = mActivity;
         mDialog.show();
     }
 
@@ -125,6 +142,7 @@ final class UpdateDialog {
 
     private void startDownload() {
         mDownloading = true;
+        mWaiting = false;
         mCancelled = new AtomicBoolean(false);
         final AtomicBoolean cancelled = mCancelled;
 
@@ -143,15 +161,38 @@ final class UpdateDialog {
             boolean ok = false;
             int error = R.string.update_download_failed;
             try {
-                ok = UpdateManager.download(mActivity, mInfo, mApk, cancelled, this::onProgress);
+                ok = UpdateManager.download(mActivity, mInfo, mApk, cancelled, new UpdateManager.ProgressCallback() {
+                    @Override
+                    public void onProgress(long done, long total, long bytesPerSecond) {
+                        UpdateDialog.this.onProgress(done, total, bytesPerSecond);
+                    }
+
+                    @Override
+                    public void onWaiting(boolean waiting) {
+                        UpdateDialog.this.onWaiting(waiting);
+                    }
+                });
             } catch (UpdateManager.ChecksumException e) {
                 error = R.string.update_download_corrupt;
+            } catch (UpdateManager.StorageException e) {
+                error = R.string.update_download_no_space;
             } catch (Exception e) {
                 android.util.Log.w("UpdateDialog", "Update download failed", e);
             }
             final boolean success = ok;
             final int errorText = error;
             UpdateManager.runOnUi(mActivity, () -> onFinished(success, cancelled.get(), errorText));
+        });
+    }
+
+    /** No internet: the window says so and the download goes on by itself when the connection is back */
+    private void onWaiting(boolean waiting) {
+        if (mWaiting == waiting) return;
+        mWaiting = waiting;
+        UpdateManager.runOnUi(mActivity, () -> {
+            if (!mDownloading) return;
+            mStatus.setText(waiting ? R.string.update_waiting_internet : R.string.update_downloading);
+            if (waiting) mSpeed.setText("");
         });
     }
 
@@ -190,9 +231,9 @@ final class UpdateDialog {
             mPrimary.setText(R.string.update_action_install);
             UpdateManager.install(mActivity, mInfo, mApk);
         } else {
+            // The progress stays where it stopped, "Try again" goes on from there
             mProgressGroup.setVisibility(View.VISIBLE);
             mProgress.setIndeterminate(false);
-            mProgress.setProgress(0);
             mStatus.setText(errorText);
             mPrimary.setText(R.string.update_action_retry);
             Toast.makeText(mActivity, errorText, Toast.LENGTH_LONG).show();

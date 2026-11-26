@@ -104,6 +104,7 @@ public class GameService extends Service {
         } else {
             startForeground(NotificationUtils.NOTIFICATION_ID_GAME_SERVICE, notification);
         }
+        git.artdeell.mojo.utils.ClickSounds.playNotification(this);
         return START_NOT_STICKY; // non-sticky so android wont try restarting the game after the user uses the "Quit" button
     }
 
