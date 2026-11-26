@@ -3,9 +3,10 @@
     android:height="64dp"
     android:viewportWidth="48"
     android:viewportHeight="48">
-  <!-- Admin panel: a window with a title bar, a sidebar and two content blocks -->
+  <!-- Admin panel: a window with a title bar, a sidebar and two content blocks.
+       No fillType here: with minSdk 23 the build converts vectors that use it to PNG and fails on ?attr colors.
+       The hole is drawn with the opposite direction instead, like the other pixel icons. -->
   <path
-      android:pathData="M4,8h40v32h-40z M8,16v20h32v-20z M12,20h8v12h-8z M24,20h12v4h-12z M24,28h12v4h-12z"
-      android:fillType="evenOdd"
+      android:pathData="M4,8h40v32h-40zM8,16v20h32v-20zM12,20h8v12h-8zM24,20h12v4h-12zM24,28h12v4h-12z"
       android:fillColor="?attr/colorOnSurface"/>
 </vector>
