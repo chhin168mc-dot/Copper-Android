@@ -142,20 +142,14 @@
             android:textAppearance="?attr/textAppearanceTitleSmall"
             android:textColor="?attr/colorOnSurface" />
 
-        <ScrollView
+        <TextView
+            android:id="@+id/update_notes"
             android:layout_width="match_parent"
-            android:layout_height="132dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:fadeScrollbars="false">
-
-            <TextView
-                android:id="@+id/update_notes"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textAppearance="?attr/textAppearanceBodyMedium"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textIsSelectable="true" />
-        </ScrollView>
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textIsSelectable="true" />
     </LinearLayout>
 
     <LinearLayout
@@ -220,7 +214,7 @@
         android:id="@+id/update_primary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="12dp"
         android:text="@string/update_action_download" />
 
     <LinearLayout
