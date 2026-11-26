@@ -31,7 +31,7 @@ import git.artdeell.mojo.R;
  * The close button hides the announcement that is shown; a new one (other updated_at) shows again.
  * The announcement also closes by itself after {@link #AUTO_CLOSE_MS}, a bar under it runs out meanwhile.
  */
-public class AnnouncementBanner {
+public final class NokorAnnouncementBanner {
     private static final long POLL_MS = 10_000L;
     private static final long AUTO_CLOSE_MS = 5_000L;
     private static final String PREF_DISMISSED = "announcementDismissed";
@@ -61,7 +61,7 @@ public class AnnouncementBanner {
         }
     };
 
-    public AnnouncementBanner(@NonNull View banner) {
+    public NokorAnnouncementBanner(@NonNull View banner) {
         this.context = banner.getContext().getApplicationContext();
         this.banner = banner;
         this.text = banner.findViewById(R.id.announcement_text);

@@ -50,7 +50,7 @@ import git.artdeell.mojo.extra.ExtraCore;
 import git.artdeell.mojo.instances.Instance;
 import git.artdeell.mojo.instances.Instances;
 import git.artdeell.mojo.modding.modpacks.models.ContentType;
-import git.artdeell.mojo.update.AnnouncementBanner;
+import git.artdeell.mojo.update.NokorAnnouncementBanner;
 import git.artdeell.mojo.utils.FileUtils;
 import git.artdeell.mojo.utils.LauncherBackground;
 import git.artdeell.mojo.utils.ThemeColors;
@@ -71,7 +71,7 @@ public class MainMenuFragment extends Fragment {
     /* The two-pane views, null in portrait */
     private FrameLayout mRightPane;
     private View mBottomBar;
-    private AnnouncementBanner mAnnouncement;
+    private NokorAnnouncementBanner mAnnouncement;
     /* The sidebar and the pane that replaces it while the content picker is open, null in portrait */
     private View mLeftSidebar;
     private FrameLayout mLeftPaneContainer;
@@ -588,7 +588,7 @@ public class MainMenuFragment extends Fragment {
         mRightPane = view.findViewById(R.id.right_pane_container);
         mBottomBar = view.findViewById(R.id.bottom_bar);
         View announcementView = view.findViewById(R.id.announcement_banner);
-        mAnnouncement = announcementView != null ? new AnnouncementBanner(announcementView) : null;
+        mAnnouncement = announcementView != null ? new NokorAnnouncementBanner(announcementView) : null;
         mLeftSidebar = view.findViewById(R.id.left_sidebar);
         mLeftPaneContainer = view.findViewById(R.id.left_pane_container);
         mPaneGuideline = view.findViewById(R.id.pane_guideline);
