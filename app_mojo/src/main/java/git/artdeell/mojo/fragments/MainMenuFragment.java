@@ -50,6 +50,7 @@ import git.artdeell.mojo.extra.ExtraCore;
 import git.artdeell.mojo.instances.Instance;
 import git.artdeell.mojo.instances.Instances;
 import git.artdeell.mojo.modding.modpacks.models.ContentType;
+import git.artdeell.mojo.update.AnnouncementBanner;
 import git.artdeell.mojo.utils.FileUtils;
 import git.artdeell.mojo.utils.LauncherBackground;
 import git.artdeell.mojo.utils.ThemeColors;
@@ -70,6 +71,7 @@ public class MainMenuFragment extends Fragment {
     /* The two-pane views, null in portrait */
     private FrameLayout mRightPane;
     private View mBottomBar;
+    private AnnouncementBanner mAnnouncement;
     /* The sidebar and the pane that replaces it while the content picker is open, null in portrait */
     private View mLeftSidebar;
     private FrameLayout mLeftPaneContainer;
@@ -171,6 +173,7 @@ public class MainMenuFragment extends Fragment {
         boolean atHome = getChildFragmentManager().getBackStackEntryCount() == 0;
         // While the tiles are edited the bar holds the edit buttons, wherever the right pane is
         mBottomBar.setVisibility(atHome || mEditing ? View.VISIBLE : View.GONE);
+        if (mAnnouncement != null) mAnnouncement.setAllowed(atHome);
         // The menu belongs to the home screen as well
         if (mMenuButton != null) mMenuButton.setVisibility(atHome ? View.VISIBLE : View.GONE);
         if (mMenuEdge != null) mMenuEdge.setVisibility(atHome ? View.VISIBLE : View.GONE);
@@ -584,6 +587,8 @@ public class MainMenuFragment extends Fragment {
 
         mRightPane = view.findViewById(R.id.right_pane_container);
         mBottomBar = view.findViewById(R.id.bottom_bar);
+        View announcementView = view.findViewById(R.id.announcement_banner);
+        mAnnouncement = announcementView != null ? new AnnouncementBanner(announcementView) : null;
         mLeftSidebar = view.findViewById(R.id.left_sidebar);
         mLeftPaneContainer = view.findViewById(R.id.left_pane_container);
         mPaneGuideline = view.findViewById(R.id.pane_guideline);
@@ -679,6 +684,8 @@ public class MainMenuFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        if (mAnnouncement != null) mAnnouncement.stop();
+        mAnnouncement = null;
         getChildFragmentManager().removeOnBackStackChangedListener(mBackStackListener);
         mRightPane = null;
         mBottomBar = null;
@@ -722,9 +729,16 @@ public class MainMenuFragment extends Fragment {
     public void onResume() {
         super.onResume();
         if (mHomeTiles != null) mHomeTiles.onResume();
+        if (mAnnouncement != null) mAnnouncement.start();
         ExtraCore.setValue(ExtraConstants.REFRESH_ACCOUNT_SPINNER, true);
         // Runs after the task listeners, which could have changed the bar
         if (mBottomBar != null) mBottomBar.post(this::updateBottomBar);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (mAnnouncement != null) mAnnouncement.stop();
     }
 
     public void runInstallerWithConfirmation() {
