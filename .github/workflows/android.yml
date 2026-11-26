@@ -1,10 +1,10 @@
 name: Android CI
 
 on:
-  push:
-  workflow_dispatch:
-  branch_protection_rule:
-    types: [labeled]
+  #push:
+  #workflow_dispatch:
+  #branch_protection_rule:
+    #types: [labeled]
 
 permissions:
   contents: write
