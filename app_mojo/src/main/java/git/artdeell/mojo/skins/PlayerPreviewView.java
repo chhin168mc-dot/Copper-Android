@@ -76,10 +76,14 @@ public class PlayerPreviewView extends View {
     private float mDownX, mDownY;
     private boolean mDragging;
     private long mLastFrameTime;
+    private float mLastCapeYaw = Float.NaN;
+    private float mLastCapePitch = Float.NaN;
+    private float mCapeSwingDegrees = CAPE_TILT_DEGREES;
 
     private final Paint mPaint = new Paint();
     private final RectF mDst = new RectF();
     private final float[] mView = new float[12];
+    private final float[][] mAnimatedCapeFaces = new float[6][12];
 
     // Textures as plain pixels, read once per model rebuild
     private int[] mSkinPixels;
@@ -186,28 +190,8 @@ public class PlayerPreviewView extends View {
         float x = -5, y = 7.5f, z = -3.28f, w = 10, h = 16, d = 1f;
         fillFaces(part.baseFaces, x, y, z, w, h, d, 0);
         fillRects(part.baseRects, s, 0, 0, 10, 16, 1, true);
-        // The cape hangs from the top of its inner surface (the surface that touches the back),
-        // the lower edge only swings backwards, away from the body, so the two never cross
-        tilt(part.baseFaces, y + h, z + d, (float) Math.toRadians(CAPE_TILT_DEGREES));
+        // Keep a neutral pose; the cape is animated around its top hinge every frame.
         mParts.add(part);
-    }
-
-    private static void tilt(float[][] faces, float pivotY, float pivotZ, float angle) {
-        for (float[] face : faces) {
-            for (int i = 0; i < 12; i += 3) {
-                float[] p = {face[i], face[i + 1], face[i + 2]};
-                tiltPoint(p, pivotY, pivotZ, angle);
-                face[i] = p[0]; face[i + 1] = p[1]; face[i + 2] = p[2];
-            }
-        }
-    }
-
-    /** Rotates around the X axis so that points below the pivot swing backwards (-z) */
-    private static void tiltPoint(float[] p, float pivotY, float pivotZ, float angle) {
-        float dy = p[1] - pivotY, dz = p[2] - pivotZ;
-        float cos = (float) Math.cos(angle), sin = (float) Math.sin(angle);
-        p[1] = pivotY + dy * cos - dz * sin;
-        p[2] = pivotZ + dy * sin + dz * cos;
     }
 
     /**
@@ -261,9 +245,29 @@ public class PlayerPreviewView extends View {
         if (mSkin == null || mSkinPixels == null || mParts.isEmpty() || getWidth() <= 0 || getHeight() <= 0) return;
 
         long now = SystemClock.uptimeMillis();
-        if (mLastFrameTime != 0 && !mDragging) {
-            float dt = Math.min(now - mLastFrameTime, 100) / 1000f;
+        float dt = mLastFrameTime == 0 ? 1f / 60f : Math.min(now - mLastFrameTime, 50) / 1000f;
+        if (!mDragging) {
             mYaw = (mYaw + AUTO_ROTATE_DEGREES_PER_SECOND * dt) % 360f;
+        }
+
+        // The cape has inertia: it trails behind turns and gently flutters while idle.
+        float yawDelta = 0f, pitchDelta = 0f;
+        if (!Float.isNaN(mLastCapeYaw)) {
+            yawDelta = mYaw - mLastCapeYaw;
+            if (yawDelta > 180f) yawDelta -= 360f;
+            if (yawDelta < -180f) yawDelta += 360f;
+            pitchDelta = mPitch - mLastCapePitch;
+        }
+        mLastCapeYaw = mYaw;
+        mLastCapePitch = mPitch;
+        if (mCape != null) {
+            float turnLag = Math.max(-18f, Math.min(18f, -yawDelta * 0.75f));
+            float pitchLag = Math.max(-7f, Math.min(7f, -pitchDelta * 0.55f));
+            float flutter = (float) Math.sin(now * 0.0032f) * 2.2f;
+            float target = CAPE_TILT_DEGREES + turnLag + pitchLag + flutter;
+            mCapeSwingDegrees += (target - mCapeSwingDegrees) * Math.min(1f, dt * 9f);
+        } else {
+            mCapeSwingDegrees = CAPE_TILT_DEGREES;
         }
         mLastFrameTime = now;
 
@@ -292,7 +296,11 @@ public class PlayerPreviewView extends View {
             int[] pixels = part.cape ? mCapePixels : mSkinPixels;
             int textureWidth = part.cape ? mCapeWidth : mSkinWidth;
             if (pixels == null) continue;
-            drawFaces(pixels, textureWidth, part.baseFaces, part.baseRects, cy, sy, cp, sp, bufferScale, originX, originY);
+            if (part.cape) {
+                drawAnimatedCape(part, cy, sy, cp, sp, bufferScale, originX, originY);
+            } else {
+                drawFaces(pixels, textureWidth, part.baseFaces, part.baseRects, cy, sy, cp, sp, bufferScale, originX, originY);
+            }
             if (part.hasOverlay) {
                 drawFaces(pixels, textureWidth, part.overlayFaces, part.overlayRects, cy, sy, cp, sp, bufferScale, originX, originY);
             }
@@ -305,6 +313,29 @@ public class PlayerPreviewView extends View {
         mDst.set(left, top, left + width * factor, top + height * factor);
         canvas.drawBitmap(mFrame, null, mDst, mPaint);
         postInvalidateOnAnimation();
+    }
+
+    /** Draws the cape after rotating it around the shoulder-level hinge. */
+    private void drawAnimatedCape(Part part, float cy, float sy, float cp, float sp,
+                                  float scale, float originX, float originY) {
+        float[][] animated = mAnimatedCapeFaces;
+        float pivotY = 23.5f;
+        float pivotZ = -2.28f;
+        float angle = (float) Math.toRadians(mCapeSwingDegrees);
+        float cos = (float) Math.cos(angle);
+        float sin = (float) Math.sin(angle);
+        for (int face = 0; face < 6; face++) {
+            System.arraycopy(part.baseFaces[face], 0, animated[face], 0, 12);
+            float[] vertices = animated[face];
+            for (int i = 0; i < 12; i += 3) {
+                float dy = vertices[i + 1] - pivotY;
+                float dz = vertices[i + 2] - pivotZ;
+                vertices[i + 1] = pivotY + dy * cos - dz * sin;
+                vertices[i + 2] = pivotZ + dy * sin + dz * cos;
+            }
+        }
+        drawFaces(mCapePixels, mCapeWidth, animated, part.baseRects,
+                cy, sy, cp, sp, scale, originX, originY);
     }
 
     /** Makes the frame buffer the wanted size, it is reused from frame to frame */
