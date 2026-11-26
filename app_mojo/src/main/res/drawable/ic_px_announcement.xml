@@ -1,0 +1,11 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+  <!-- Admin panel: a window with a title bar, a sidebar and two content blocks -->
+  <path
+      android:pathData="M4,8h40v32h-40z M8,16v20h32v-20z M12,20h8v12h-8z M24,20h12v4h-12z M24,28h12v4h-12z"
+      android:fillType="evenOdd"
+      android:fillColor="?attr/colorOnSurface"/>
+</vector>
